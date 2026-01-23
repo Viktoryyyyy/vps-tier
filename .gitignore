@@ -1,0 +1,22 @@
+# Runtime & local state
+.env
+*.log
+*.pid
+*.sock
+
+# Python
+__pycache__/
+*.pyc
+
+# Virtual envs
+venv/
+.envrc
+
+# Backups
+_backup/
+*.bak*
+
+# Migration / validation artifacts
+stage_validation*.txt
+migration_inventory*.txt
+MANAGED_ROOTS.txt

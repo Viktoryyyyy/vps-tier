@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "users": [
+    {
+      "tg_id": "875081336",
+      "status": "active",
+      "paid_until": "2026-04-22",
+      "devices_limit": 2,
+      "max_conns": 2,
+      "sub_id": "245cd90b-f2e3-4823-a1ae-d95e5dd1e7d9",
+      "sub_url": "https://sub.stferry.com:8443/s/245cd90b-f2e3-4823-a1ae-d95e5dd1e7d9.txt",
+      "vless_id": "ec102232-9f4c-403a-ad0a-06b6e4d676eb"
+    },
+    {
+      "tg_id": "1762767614",
+      "status": "active",
+      "paid_until": "2026-01-29",
+      "sub_url": null,
+      "sub_id": null,
+      "vless_id": null,
+      "devices_limit": null,
+      "max_conns": null
+    },
+    {
+      "tg_id": "6101330111",
+      "status": "expired",
+      "paid_until": "2026-01-16",
+      "sub_id": "6f71498c-550d-4b3a-affb-61e17183e327",
+      "sub_url": "https://sub.stferry.com:8443/s/6f71498c-550d-4b3a-affb-61e17183e327.txt"
+    }
+  ]
+}
