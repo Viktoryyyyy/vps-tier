@@ -1,0 +1,75 @@
+enabled
+enabled
+enabled
+enabled
+enabled
+
+● xray.service - Xray Service
+     Loaded: loaded (/etc/systemd/system/xray.service; enabled; vendor preset: enabled)
+    Drop-In: /etc/systemd/system/xray.service.d
+             └─10-donot_touch_single_conf.conf
+     Active: active (running) since Thu 2026-01-22 09:41:31 UTC; 4 days ago
+       Docs: https://github.com/xtls
+   Main PID: 2170 (xray)
+      Tasks: 11 (limit: 2217)
+     Memory: 54.4M
+        CPU: 2h 26min 31.418s
+     CGroup: /system.slice/xray.service
+             └─2170 /usr/local/bin/xray run -config /usr/local/etc/xray/config.json
+
+Jan 26 13:29:25 33701 xray[2170]: 2026/01/26 13:29:25.833182 from 46.138.236.102:2337 accepted tcp:5.28.195.2:443 [vless443 >> direct]
+Jan 26 13:29:25 33701 xray[2170]: 2026/01/26 13:29:25.838407 from 46.138.236.102:2336 accepted tcp:5.28.195.2:5222 [vless443 >> direct]
+Jan 26 13:29:25 33701 xray[2170]: 2026/01/26 13:29:25.845526 from 46.138.236.102:2335 accepted tcp:5.28.195.2:80 [vless443 >> direct]
+Jan 26 13:29:26 33701 xray[2170]: 2026/01/26 13:29:26.077040 from 94.29.3.12:3181 accepted tcp:beacons.gcp.gvt2.com:443 [vless443 >> direct]
+Jan 26 13:29:27 33701 xray[2170]: 2026/01/26 13:29:27.029375 from 213.87.161.52:23442 accepted tcp:sdk.split.io:443 [vless443 >> direct]
+Jan 26 13:29:27 33701 xray[2170]: 2026/01/26 13:29:27.040721 from 213.87.161.52:18643 accepted udp:api.termius.com:443 [vless443 >> direct]
+Jan 26 13:29:27 33701 xray[2170]: 2026/01/26 13:29:27.138915 from 213.87.161.52:14641 accepted tcp:one.one.one.one:443 [vless443 >> direct]
+Jan 26 13:29:27 33701 xray[2170]: 2026/01/26 13:29:27.202351 from 213.87.161.52:11858 accepted tcp:auth.split.io:443 [vless443 >> direct]
+Jan 26 13:29:27 33701 xray[2170]: 2026/01/26 13:29:27.203788 from 213.87.161.52:26429 accepted udp:api.termius.com:443 [vless443 >> direct]
+Jan 26 13:29:27 33701 xray[2170]: 2026/01/26 13:29:27.213330 from 213.87.161.52:4445 accepted tcp:api.termius.com:443 [vless443 >> direct]
+
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/lib/systemd/system/nginx.service; enabled; vendor preset: enabled)
+     Active: active (running) since Thu 2026-01-22 09:32:30 UTC; 4 days ago
+       Docs: man:nginx(8)
+    Process: 728 ExecStartPre=/usr/sbin/nginx -t -q -g daemon on; master_process on; (code=exited, status=0/SUCCESS)
+    Process: 793 ExecStart=/usr/sbin/nginx -g daemon on; master_process on; (code=exited, status=0/SUCCESS)
+   Main PID: 801 (nginx)
+      Tasks: 3 (limit: 2217)
+     Memory: 10.9M
+        CPU: 9.775s
+     CGroup: /system.slice/nginx.service
+             ├─801 "nginx: master process /usr/sbin/nginx -g daemon on; master_process on;"
+             ├─803 "nginx: worker process" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" ""
+             └─804 "nginx: worker process" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" ""
+
+Jan 22 09:32:29 33701 systemd[1]: Starting A high performance web server and a reverse proxy server...
+Jan 22 09:32:30 33701 systemd[1]: Started A high performance web server and a reverse proxy server.
+
+● tg-bot.service - Telegram VPN Bot
+     Loaded: loaded (/etc/systemd/system/tg-bot.service; enabled; vendor preset: enabled)
+     Active: active (running) since Thu 2026-01-22 09:32:29 UTC; 4 days ago
+   Main PID: 742 (python)
+      Tasks: 3 (limit: 2217)
+     Memory: 30.4M
+        CPU: 5min 10.097s
+     CGroup: /system.slice/tg-bot.service
+             └─742 /opt/tg_bot/venv/bin/python /opt/tg_bot/bot.py
+
+Jan 22 09:32:29 33701 systemd[1]: Started Telegram VPN Bot.
+
+● tier1-health.timer - Run Tier-1 health snapshot every minute
+     Loaded: loaded (/etc/systemd/system/tier1-health.timer; enabled; vendor preset: enabled)
+     Active: active (waiting) since Thu 2026-01-22 09:32:29 UTC; 4 days ago
+    Trigger: Mon 2026-01-26 13:29:31 UTC; 2s left
+   Triggers: ● tier1-health.service
+
+Jan 22 09:32:29 33701 systemd[1]: Started Run Tier-1 health snapshot every minute.
+
+● tier1-alert.timer - Run Tier-1 Telegram CRIT alert every minute
+     Loaded: loaded (/etc/systemd/system/tier1-alert.timer; enabled; vendor preset: enabled)
+     Active: active (waiting) since Thu 2026-01-22 09:32:29 UTC; 4 days ago
+    Trigger: Mon 2026-01-26 13:29:31 UTC; 1s left
+   Triggers: ● tier1-alert.service
+
+Jan 22 09:32:29 33701 systemd[1]: Started Run Tier-1 Telegram CRIT alert every minute.

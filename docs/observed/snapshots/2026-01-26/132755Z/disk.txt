@@ -1,0 +1,15 @@
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           197M  1.3M  196M   1% /run
+/dev/sda2        40G  8.0G   30G  22% /
+tmpfs           982M     0  982M   0% /dev/shm
+tmpfs           5.0M     0  5.0M   0% /run/lock
+tmpfs           982M     0  982M   0% /run/qemu
+tmpfs           197M  4.0K  197M   1% /run/user/1000
+
+Filesystem      Inodes  IUsed   IFree IUse% Mounted on
+tmpfs           251337    793  250544    1% /run
+/dev/sda2      2560000 133574 2426426    6% /
+tmpfs           251337      1  251336    1% /dev/shm
+tmpfs           251337      3  251334    1% /run/lock
+tmpfs           251337      1  251336    1% /run/qemu
+tmpfs            50267     25   50242    1% /run/user/1000

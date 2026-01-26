@@ -1,0 +1,2 @@
+default via 194.32.142.1 dev enp3s0 proto static 
+194.32.142.0/24 dev enp3s0 proto kernel scope link src 194.32.142.88 
