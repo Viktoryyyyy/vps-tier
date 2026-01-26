@@ -1,0 +1,21 @@
+NEXT                        LEFT          LAST                        PASSED        UNIT                           ACTIVATES
+Mon 2026-01-26 14:10:03 UTC 10min left    Sun 2026-01-25 22:40:18 UTC 15h ago       fwupd-refresh.timer            fwupd-refresh.service
+Mon 2026-01-26 17:49:25 UTC 3h 49min left Mon 2026-01-26 08:35:23 UTC 5h 24min ago  certbot.timer                  certbot.service
+Mon 2026-01-26 19:18:15 UTC 5h 18min left Mon 2026-01-26 11:51:18 UTC 2h 8min ago   apt-daily.timer                apt-daily.service
+Tue 2026-01-27 00:00:00 UTC 10h left      Mon 2026-01-26 00:00:03 UTC 13h ago       dpkg-db-backup.timer           dpkg-db-backup.service
+Tue 2026-01-27 00:00:00 UTC 10h left      Mon 2026-01-26 00:00:03 UTC 13h ago       logrotate.timer                logrotate.service
+Tue 2026-01-27 06:51:26 UTC 16h left      Mon 2026-01-26 06:07:12 UTC 7h ago        apt-daily-upgrade.timer        apt-daily-upgrade.service
+Tue 2026-01-27 06:51:36 UTC 16h left      Mon 2026-01-26 13:11:32 UTC 47min ago     motd-news.timer                motd-news.service
+Tue 2026-01-27 09:37:27 UTC 19h left      Mon 2026-01-26 09:37:27 UTC 4h 21min ago  update-notifier-download.timer update-notifier-download.service
+Tue 2026-01-27 09:47:27 UTC 19h left      Mon 2026-01-26 09:47:27 UTC 4h 11min ago  systemd-tmpfiles-clean.timer   systemd-tmpfiles-clean.service
+Tue 2026-01-27 10:48:51 UTC 20h left      Mon 2026-01-26 01:48:49 UTC 12h ago       man-db.timer                   man-db.service
+Fri 2026-01-30 00:29:53 UTC 3 days left   Tue 2026-01-20 13:13:50 UTC 6 days ago    update-notifier-motd.timer     update-notifier-motd.service
+Sun 2026-02-01 03:10:10 UTC 5 days left   Sun 2026-01-25 03:10:45 UTC 1 day 10h ago e2scrub_all.timer              e2scrub_all.service
+Mon 2026-02-02 01:21:17 UTC 6 days left   Mon 2026-01-26 01:33:59 UTC 12h ago       fstrim.timer                   fstrim.service
+n/a                         n/a           n/a                         n/a           apport-autoreport.timer        apport-autoreport.service
+n/a                         n/a           n/a                         n/a           snapd.snap-repair.timer        snapd.snap-repair.service
+n/a                         n/a           Mon 2026-01-26 13:59:27 UTC 96ms ago      tier1-alert.timer              tier1-alert.service
+n/a                         n/a           Mon 2026-01-26 13:59:27 UTC 85ms ago      tier1-health.timer             tier1-health.service
+n/a                         n/a           n/a                         n/a           ua-timer.timer                 ua-timer.service
+
+18 timers listed.

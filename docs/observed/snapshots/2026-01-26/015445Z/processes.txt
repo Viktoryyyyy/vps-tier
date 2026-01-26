@@ -1,0 +1,156 @@
+    PID    PPID CMD                         ELAPSED %CPU %MEM
+      1       0 /sbin/init                   361667  0.1  0.5
+      2       0 [kthreadd]                   361667  0.0  0.0
+      3       2 [rcu_gp]                     361667  0.0  0.0
+      4       2 [rcu_par_gp]                 361667  0.0  0.0
+      5       2 [slub_flushwq]               361667  0.0  0.0
+      6       2 [netns]                      361667  0.0  0.0
+      8       2 [kworker/0:0H-events_highpr  361667  0.0  0.0
+     10       2 [mm_percpu_wq]               361667  0.0  0.0
+     11       2 [rcu_tasks_rude_]            361667  0.0  0.0
+     12       2 [rcu_tasks_trace]            361667  0.0  0.0
+     13       2 [ksoftirqd/0]                361667  0.0  0.0
+     14       2 [rcu_sched]                  361667  0.6  0.0
+     15       2 [migration/0]                361667  0.0  0.0
+     16       2 [idle_inject/0]              361667  0.0  0.0
+     18       2 [cpuhp/0]                    361667  0.0  0.0
+     19       2 [cpuhp/1]                    361667  0.0  0.0
+     20       2 [idle_inject/1]              361667  0.0  0.0
+     21       2 [migration/1]                361667  0.0  0.0
+     22       2 [ksoftirqd/1]                361667  0.1  0.0
+     24       2 [kworker/1:0H-events_highpr  361667  0.0  0.0
+     25       2 [kdevtmpfs]                  361667  0.0  0.0
+     26       2 [inet_frag_wq]               361667  0.0  0.0
+     27       2 [kauditd]                    361667  0.0  0.0
+     28       2 [khungtaskd]                 361667  0.0  0.0
+     29       2 [oom_reaper]                 361667  0.0  0.0
+     30       2 [writeback]                  361667  0.0  0.0
+     31       2 [kcompactd0]                 361667  0.0  0.0
+     32       2 [ksmd]                       361667  0.0  0.0
+     33       2 [khugepaged]                 361667  0.0  0.0
+     80       2 [kintegrityd]                361667  0.0  0.0
+     81       2 [kblockd]                    361667  0.0  0.0
+     82       2 [blkcg_punt_bio]             361667  0.0  0.0
+     84       2 [tpm_dev_wq]                 361665  0.0  0.0
+     85       2 [ata_sff]                    361665  0.0  0.0
+     86       2 [md]                         361665  0.0  0.0
+     87       2 [edac-poller]                361665  0.0  0.0
+     88       2 [devfreq_wq]                 361665  0.0  0.0
+     89       2 [watchdogd]                  361665  0.0  0.0
+     90       2 [kworker/0:1H-kblockd]       361665  0.0  0.0
+     92       2 [kswapd0]                    361662  0.0  0.0
+     93       2 [ecryptfs-kthrea]            361662  0.0  0.0
+     95       2 [kthrotld]                   361662  0.0  0.0
+     96       2 [irq/24-aerdrv]              361662  0.0  0.0
+     97       2 [irq/25-aerdrv]              361662  0.0  0.0
+     98       2 [irq/26-aerdrv]              361662  0.0  0.0
+     99       2 [irq/27-aerdrv]              361662  0.0  0.0
+    100       2 [irq/28-aerdrv]              361662  0.0  0.0
+    101       2 [irq/29-aerdrv]              361662  0.0  0.0
+    102       2 [irq/30-aerdrv]              361662  0.0  0.0
+    103       2 [irq/31-aerdrv]              361662  0.0  0.0
+    104       2 [irq/32-aerdrv]              361662  0.0  0.0
+    105       2 [irq/33-aerdrv]              361662  0.0  0.0
+    106       2 [irq/34-aerdrv]              361662  0.0  0.0
+    107       2 [irq/35-aerdrv]              361662  0.0  0.0
+    108       2 [irq/36-aerdrv]              361662  0.0  0.0
+    109       2 [irq/37-aerdrv]              361662  0.0  0.0
+    110       2 [irq/38-aerdrv]              361662  0.0  0.0
+    111       2 [irq/39-aerdrv]              361662  0.0  0.0
+    112       2 [irq/40-aerdrv]              361662  0.0  0.0
+    113       2 [irq/41-aerdrv]              361662  0.0  0.0
+    114       2 [irq/42-aerdrv]              361662  0.0  0.0
+    115       2 [irq/43-aerdrv]              361662  0.0  0.0
+    116       2 [irq/44-aerdrv]              361662  0.0  0.0
+    117       2 [irq/45-aerdrv]              361662  0.0  0.0
+    118       2 [irq/46-aerdrv]              361662  0.0  0.0
+    119       2 [irq/47-aerdrv]              361662  0.0  0.0
+    120       2 [irq/48-aerdrv]              361662  0.0  0.0
+    121       2 [irq/49-aerdrv]              361662  0.0  0.0
+    122       2 [irq/50-aerdrv]              361662  0.0  0.0
+    123       2 [irq/51-aerdrv]              361662  0.0  0.0
+    124       2 [irq/52-aerdrv]              361662  0.0  0.0
+    125       2 [acpi_thermal_pm]            361662  0.0  0.0
+    127       2 [vfio-irqfd-clea]            361662  0.0  0.0
+    128       2 [mld]                        361662  0.0  0.0
+    129       2 [kworker/1:1H-kblockd]       361662  0.0  0.0
+    130       2 [ipv6_addrconf]              361662  0.0  0.0
+    141       2 [kstrp]                      361660  0.0  0.0
+    144       2 [zswap-shrink]               361660  0.0  0.0
+    145       2 [kworker/u5:0]               361660  0.0  0.0
+    150       2 [charger_manager]            361660  0.0  0.0
+    190       2 [scsi_eh_0]                  361659  0.0  0.0
+    191       2 [scsi_tmf_0]                 361659  0.0  0.0
+    192       2 [hwrng]                      361659  0.0  0.0
+    193       2 [cryptd]                     361659  0.0  0.0
+    206       2 [scsi_eh_1]                  361659  0.0  0.0
+    214       2 [scsi_tmf_1]                 361659  0.0  0.0
+    229       2 [scsi_eh_2]                  361659  0.0  0.0
+    230       2 [scsi_tmf_2]                 361659  0.0  0.0
+    232       2 [scsi_eh_3]                  361659  0.0  0.0
+    234       2 [scsi_tmf_3]                 361659  0.0  0.0
+    236       2 [scsi_eh_4]                  361659  0.0  0.0
+    238       2 [scsi_tmf_4]                 361659  0.0  0.0
+    241       2 [scsi_eh_5]                  361659  0.0  0.0
+    243       2 [scsi_tmf_5]                 361659  0.0  0.0
+    245       2 [scsi_eh_6]                  361659  0.0  0.0
+    246       2 [scsi_tmf_6]                 361659  0.0  0.0
+    293       2 [raid5wq]                    361657  0.0  0.0
+    340       2 [jbd2/sda2-8]                361657  0.0  0.0
+    341       2 [ext4-rsv-conver]            361657  0.0  0.0
+    428       1 /lib/systemd/systemd-journa  361655  0.1  4.5
+    456       2 [kaluad]                     361655  0.0  0.0
+    461       2 [kmpath_rdacd]               361655  0.0  0.0
+    462       2 [kmpathd]                    361655  0.0  0.0
+    463       2 [kmpath_handlerd]            361655  0.0  0.0
+    464       1 /sbin/multipathd -d -s       361655  0.0  1.3
+    482       1 /lib/systemd/systemd-udevd   361654  0.0  0.3
+    555       1 /lib/systemd/systemd-timesy  361653  0.0  0.3
+    660       1 /lib/systemd/systemd-networ  361651  0.0  0.3
+    661       1 /sbin/auditd                 361651  0.0  0.0
+    682       1 /lib/systemd/systemd-resolv  361651  0.1  0.7
+    719       1 /usr/sbin/cron -f -P         361647  0.0  0.1
+    720       1 @dbus-daemon --system --add  361647  0.0  0.2
+    726       1 /usr/sbin/irqbalance --fore  361647  0.0  0.1
+    727       1 /usr/bin/python3 /usr/bin/n  361647  0.0  0.7
+    729       1 /usr/libexec/polkitd --no-d  361647  0.0  0.2
+    731       1 /usr/sbin/qemu-ga            361647  0.0  0.0
+    732       1 /usr/sbin/rsyslogd -n -iNON  361647  0.0  0.2
+    738       1 /snap/snapd/current/usr/lib  361647  0.0  1.2
+    740       1 /lib/systemd/systemd-logind  361647  0.0  0.3
+    742       1 /opt/tg_bot/venv/bin/python  361647  0.0  1.6
+    743       1 /usr/bin/python3 -Es /usr/s  361647  0.0  1.0
+    745       1 /usr/libexec/udisks2/udisks  361647  0.0  0.5
+    761       1 /sbin/agetty -o -p -- \u --  361646  0.0  0.0
+    771       1 /sbin/agetty -o -p -- \u --  361646  0.0  0.0
+    785       1 /usr/sbin/ModemManager       361646  0.0  0.4
+    792       1 sshd: /usr/sbin/sshd -D [li  361646  0.0  0.4
+    801       1 nginx: master process /usr/  361646  0.0  0.1
+    803     801 nginx: worker process        361646  0.0  0.4
+    804     801 nginx: worker process        361646  0.0  0.3
+    808       1 /usr/bin/python3 /usr/share  361645  0.0  0.8
+   2170       1 /usr/local/bin/xray run -co  361105  2.4  2.4
+   2482       1 /usr/libexec/upowerd         360948  0.0  0.3
+  51320       1 /usr/libexec/packagekitd     330376  0.0  0.9
+ 614531       2 [kworker/u4:1-ext4-rsv-conv    2387  0.0  0.0
+ 616959       2 [kworker/u4:2-events_unboun    1140  0.0  0.0
+ 616960       2 [kworker/0:1-cgroup_destroy    1140  0.0  0.0
+ 617685       2 [kworker/1:0-cgroup_destroy     703  0.0  0.0
+ 617752       2 [kworker/1:1-events]            700  0.0  0.0
+ 618130     792 sshd: ubuntu [priv]             471  0.0  0.5
+ 618133       1 /lib/systemd/systemd --user     470  0.0  0.4
+ 618134  618133 (sd-pam)                        470  0.0  0.2
+ 618218  618130 sshd: ubuntu@pts/0              468  0.0  0.4
+ 618219  618218 -bash                           468  0.0  0.2
+ 618319       2 [kworker/0:3-events]            454  0.1  0.0
+ 618360       2 [kworker/u4:0-flush-8:0]        395  0.0  0.0
+ 618543       2 [kworker/1:2-events]            332  0.0  0.0
+ 618942       2 [kworker/0:0-events]            146  0.0  0.0
+ 618952     792 sshd: ubuntu [priv]             129  0.0  0.5
+ 619014  618952 sshd: ubuntu@pts/1              127  0.0  0.4
+ 619015  619014 -bash                           127  0.0  0.2
+ 619046     792 sshd: [accepted]                 97  0.0  0.4
+ 619158     792 sshd: [accepted]                 31  0.1  0.4
+ 619179       2 [kworker/u4:3-events_unboun      28  0.0  0.0
+ 619256     792 sshd: [accepted]                  9  0.2  0.4
+ 619264  619015 ps -eo pid,ppid,cmd,etimes,       0  0.0  0.0
