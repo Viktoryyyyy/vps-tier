@@ -9,7 +9,8 @@
       "max_conns": 2,
       "sub_id": "245cd90b-f2e3-4823-a1ae-d95e5dd1e7d9",
       "sub_url": "https://sub.stferry.com:8443/s/245cd90b-f2e3-4823-a1ae-d95e5dd1e7d9.txt",
-      "vless_id": "ec102232-9f4c-403a-ad0a-06b6e4d676eb"
+      "vless_id": "ec102232-9f4c-403a-ad0a-06b6e4d676eb",
+      "uuid": ""
     },
     {
       "tg_id": "1762767614",
