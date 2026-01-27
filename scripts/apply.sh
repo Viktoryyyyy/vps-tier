@@ -12,7 +12,7 @@ if [ ! -r "$RUNTIME_ENV_FILE" ]; then
   exit 1
 fi
 set -a
-. ""
+. "$RUNTIME_ENV_FILE"
 set +a
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
