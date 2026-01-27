@@ -11,7 +11,9 @@ if [ ! -r "$RUNTIME_ENV_FILE" ]; then
   echo "ERROR: required runtime env file missing or unreadable: $RUNTIME_ENV_FILE" >&2
   exit 1
 fi
-. "$RUNTIME_ENV_FILE"
+set -a
+. ""
+set +a
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
