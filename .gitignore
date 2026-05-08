@@ -20,3 +20,26 @@ _backup/
 stage_validation*.txt
 migration_inventory*.txt
 MANAGED_ROOTS.txt
+.build/
+
+# VPS resilience runtime exclusions
+runtime/rendered/
+runtime/output/
+runtime/artifacts/
+*.env
+.env
+.env.*
+**/rendered/
+**/generated/
+*.key
+*.pem
+*.p12
+*.pfx
+certbot/
+letsencrypt/
+users.json
+clients.json
+*.log
+logs/
+backups/
+*.bak
