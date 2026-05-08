@@ -1,0 +1,53 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "inbounds": [
+    {
+      "tag": "vless-reality-in",
+      "listen": "0.0.0.0",
+      "port": {{XRAY_REALITY_PORT}},
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "{{XRAY_CLIENT_UUID}}",
+            "flow": "xtls-rprx-vision",
+            "email": "{{XRAY_CLIENT_LABEL}}"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "dest": "{{XRAY_REALITY_DEST_HOST}}:{{XRAY_REALITY_DEST_PORT}}",
+          "xver": 0,
+          "serverNames": [
+            "{{XRAY_REALITY_SERVER_NAME}}"
+          ],
+          "privateKey": "{{XRAY_REALITY_PRIVATE_KEY}}",
+          "shortIds": [
+            "{{XRAY_REALITY_SHORT_ID}}"
+          ]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    },
+    {
+      "protocol": "blackhole",
+      "tag": "blocked"
+    }
+  ]
+}
