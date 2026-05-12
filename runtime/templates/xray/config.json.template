@@ -14,6 +14,11 @@
             "id": "{{XRAY_CLIENT_UUID}}",
             "flow": "xtls-rprx-vision",
             "email": "{{XRAY_CLIENT_LABEL}}"
+          },
+          {
+            "id": "{{XRAY_CLIENT_2_UUID}}",
+            "flow": "xtls-rprx-vision",
+            "email": "{{XRAY_CLIENT_2_LABEL}}"
           }
         ],
         "decryption": "none"
@@ -44,10 +49,6 @@
     {
       "protocol": "freedom",
       "tag": "direct"
-    },
-    {
-      "protocol": "blackhole",
-      "tag": "blocked"
     }
   ]
 }

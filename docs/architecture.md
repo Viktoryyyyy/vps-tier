@@ -17,3 +17,8 @@ Legacy/current-state paths retained but not canonical target layout:
 - opt/
 
 This baseline does not generate production configs, install packages, change server runtime behavior, or add secrets.
+
+Runtime render contract:
+- Xray canonical rendered state models one inbound, two clients, and one freedom outbound.
+- nginx canonical rendered state models both active site configs: sub.conf and sub.stferry.com.conf.
+- Rendered templates must not assume a subscription backend proxy unless live state and contract explicitly require it.
