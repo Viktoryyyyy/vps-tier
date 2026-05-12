@@ -15,7 +15,6 @@ Required Xray variables:
 - XRAY_REALITY_SHORT_ID
 
 Required nginx variables:
-- NGINX_SUB_SERVER_NAME
 - NGINX_SERVER_NAME
 - NGINX_SSL_CERT_PATH
 - NGINX_SSL_KEY_PATH
@@ -23,6 +22,8 @@ Required nginx variables:
 Rendered canonical semantics:
 - Xray: one inbound, two clients, one freedom outbound, no blackhole outbound by default.
 - nginx: renders both sub.conf and sub.stferry.com.conf.
+- sub.conf intentionally has no server_name directive because observed live semantics for /etc/nginx/sites-enabled/sub do not define one.
+- sub.stferry.com.conf retains explicit server_name placeholders.
 - No subscription backend proxy is assumed by default.
 
 Git must contain placeholders only. Do not commit real UUIDs, private keys, tokens, client links, certbot material, or rendered production configs.
