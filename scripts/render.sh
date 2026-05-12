@@ -8,6 +8,11 @@ out_dir=".render"
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
 
+[ -r /etc/vps-tier/runtime.env ] || { echo "ERROR: missing /etc/vps-tier/runtime.env" >&2; exit 1; }
+set -a
+. /etc/vps-tier/runtime.env
+set +a
+
 found=0
 
 render_one() {
@@ -15,7 +20,7 @@ render_one() {
   dst="$2"
   [ -f "$src" ] || { echo "ERROR: missing template: $src" >&2; exit 1; }
   mkdir -p "$(dirname "$dst")"
-  cp "$src" "$dst"
+  python3 scripts/render_template.py "$src" "$dst"
   found=1
 }
 
