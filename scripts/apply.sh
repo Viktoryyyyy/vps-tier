@@ -1,130 +1,162 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-  echo "ERROR: scripts/apply.sh must be run as root (use sudo)." >&2
-  exit 1
-fi
-
 RUNTIME_ENV_FILE="/etc/vps-tier/runtime.env"
-if [ ! -r "$RUNTIME_ENV_FILE" ]; then
-  echo "ERROR: required runtime env file missing or unreadable: $RUNTIME_ENV_FILE" >&2
+BACKUP_ROOT="/var/backups/vps-tier/apply"
+
+XRAY_RENDER=".render/xray/config.json"
+NGINX_SUB_RENDER=".render/nginx/sub.conf"
+NGINX_DOMAIN_RENDER=".render/nginx/sub.stferry.com.conf"
+
+XRAY_TARGET="/usr/local/etc/xray/config.json"
+NGINX_SUB_TARGET="/etc/nginx/sites-enabled/sub"
+NGINX_DOMAIN_TARGET="/etc/nginx/sites-enabled/sub.stferry.com"
+
+die() {
+  echo "ERROR: $*" >&2
   exit 1
-fi
-set -a
-. "$RUNTIME_ENV_FILE"
-set +a
+}
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ok() {
+  echo "OK: $*"
+}
 
-USERS_JSON="${USERS_JSON:-${ROOT_DIR}/opt/tg_bot/sot/users.json}"
-XRAY_CONFIG_PATH="${XRAY_CONFIG_PATH:-/usr/local/etc/xray/config.json}"
-SUB_DIR="${SUB_DIR:-/var/www/sub/s}"
-XRAY_INBOUND_MATCH_PROTOCOL="${XRAY_INBOUND_MATCH_PROTOCOL:-vless}"
-BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/.build/uuid_apply}"
-PYTHON_BIN="${PYTHON_BIN:-python3}"
-
-die() { echo "ERROR: $*" >&2; exit 1; }
-stage() { echo "==> $*"; }
-
-require_file() { [[ -f "$1" ]] || die "missing file: $1"; }
-require_cmd() { command -v "$1" >/dev/null 2>&1 || die "missing command: $1"; }
-
-stage "preflight"
-require_file "$USERS_JSON"
-require_file "$XRAY_CONFIG_PATH"
-require_cmd "$PYTHON_BIN"
-
-mkdir -p "$BUILD_DIR"
-
-CLIENTS_JSON="$BUILD_DIR/clients.json"
-SUB_OUT_DIR="$BUILD_DIR/sub"
-XRAY_CONFIG_NEW="$BUILD_DIR/config.new.json"
-
-stage "render: xray clients block from users.json"
-(
-  cd "$ROOT_DIR/src/generator"
-  "$PYTHON_BIN" render_xray.py --users "$USERS_JSON" --out "$CLIENTS_JSON"
-)
-
-stage "render: subscriptions from users.json"
-rm -rf "$SUB_OUT_DIR"
-mkdir -p "$SUB_OUT_DIR"
-(
-  cd "$ROOT_DIR/src/generator"
-  "$PYTHON_BIN" render_sub.py --users "$USERS_JSON" --out_dir "$SUB_OUT_DIR"
-)
-
-stage "render: build new xray config by patching clients"
-export XRAY_CONFIG_PATH CLIENTS_JSON XRAY_CONFIG_NEW XRAY_INBOUND_MATCH_PROTOCOL
-
-"$PYTHON_BIN" -c "import json,os
-cfg_path=os.environ.get('XRAY_CONFIG_PATH','/usr/local/etc/xray/config.json')
-clients_path=os.environ['CLIENTS_JSON']
-out_path=os.environ['XRAY_CONFIG_NEW']
-match_proto=os.environ.get('XRAY_INBOUND_MATCH_PROTOCOL','vless').strip().lower()
-cfg=json.load(open(cfg_path,'r',encoding='utf-8'))
-clients_doc=json.load(open(clients_path,'r',encoding='utf-8'))
-clients=clients_doc.get('clients')
-if not isinstance(clients,list): raise SystemExit('clients.json missing clients list')
-inbounds=cfg.get('inbounds')
-if not isinstance(inbounds,list) or not inbounds: raise SystemExit('xray config has no inbounds')
-patched=False
-for inbound in inbounds:
-    if not isinstance(inbound,dict): continue
-    proto=str(inbound.get('protocol','')).strip().lower()
-    if proto!=match_proto: continue
-    settings=inbound.get('settings')
-    if not isinstance(settings,dict):
-        settings={}
-        inbound['settings']=settings
-    settings['clients']=clients
-    patched=True
-    break
-if not patched: raise SystemExit('no inbound matched protocol')
-json.dump(cfg,open(out_path,'w',encoding='utf-8',newline='\n'),ensure_ascii=False,indent=2); open(out_path,'a',encoding='utf-8').write('\n')
-"
-
-stage "validate: JSON syntax"
-"$PYTHON_BIN" -m json.tool "$XRAY_CONFIG_NEW" >/dev/null
-
-stage "validate: xray -test (if available)"
-if command -v xray >/dev/null 2>&1; then
-  if xray run -test -config "$XRAY_CONFIG_NEW" >/dev/null 2>&1; then
-    echo "xray -test: OK"
-  else
-    die "xray -test failed for rendered config"
+require_root() {
+  if [ "${EUID:-$(id -u)}" -ne 0 ]; then
+    die "scripts/apply.sh must be run as root"
   fi
-else
-  echo "SKIP: xray binary not found; JSON validated only"
-fi
+}
 
-stage "apply: subscriptions (atomic replace per file)"
-mkdir -p "$SUB_DIR"
-for f in "$SUB_OUT_DIR"/*.txt; do
-  [[ -e "$f" ]] || break
-  base="$(basename "$f")"
-  tmp="${SUB_DIR}/${base}.tmp"
-  cp -f "$f" "$tmp"
-  chmod 0644 "$tmp" || true
-  mv -f "$tmp" "${SUB_DIR}/${base}"
-done
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "missing command: $1"
+}
 
-stage "apply: xray config (atomic replace)"
-tmp_cfg="${XRAY_CONFIG_PATH}.tmp"
-cp -f "$XRAY_CONFIG_NEW" "$tmp_cfg"
-chmod 0644 "$tmp_cfg" || true
-mv -f "$tmp_cfg" "$XRAY_CONFIG_PATH"
+require_file() {
+  [ -f "$1" ] || die "missing file: $1"
+}
 
-stage "reload: xray"
-if systemctl reload xray >/dev/null 2>&1; then
-  echo "systemctl reload xray: OK"
-else
-  systemctl restart xray >/dev/null 2>&1 || die "failed to restart xray"
-  echo "systemctl restart xray: OK"
-fi
+require_readable() {
+  [ -r "$1" ] || die "missing or unreadable file: $1"
+}
 
-stage "done"
-echo "clients rendered: $CLIENTS_JSON"
-echo "subs rendered dir: $SUB_OUT_DIR"
-echo "xray config applied: $XRAY_CONFIG_PATH"
+require_repo_root() {
+  require_cmd git
+  repo_root="$(git -c safe.directory="$PWD" rev-parse --show-toplevel 2>/dev/null)" || die "not inside a Git repository"
+  [ "$repo_root" = "$PWD" ] || die "run from repository root: $repo_root"
+  require_file "scripts/render.sh"
+  require_file "scripts/validate.sh"
+}
+
+backup_one() {
+  live_path="$1"
+  backup_path="$BACKUP_DIR/${live_path#/}"
+  mkdir -p "$(dirname "$backup_path")"
+  cp -a "$live_path" "$backup_path"
+  printf 'file\t%s\t%s\n' "$live_path" "$backup_path" >> "$BACKUP_DIR/MANIFEST.tsv"
+}
+
+atomic_install() {
+  src="$1"
+  target="$2"
+  require_file "$src"
+  require_file "$target"
+
+  target_dir="$(dirname "$target")"
+  target_base="$(basename "$target")"
+  owner="$(stat -c '%u' "$target")"
+  group="$(stat -c '%g' "$target")"
+  mode="$(stat -c '%a' "$target")"
+  tmp="$(mktemp "$target_dir/.${target_base}.apply.XXXXXX")"
+
+  cp -f "$src" "$tmp"
+  chown "$owner:$group" "$tmp"
+  chmod "$mode" "$tmp"
+  mv -f "$tmp" "$target"
+}
+
+validate_rendered_xray() {
+  python3 -m json.tool "$XRAY_RENDER" >/dev/null
+  xray run -test -config "$XRAY_RENDER" >/dev/null 2>&1 || die "xray validation failed for rendered config"
+}
+
+validate_rendered_nginx() {
+  tmp_conf="$(mktemp /tmp/vps-tier-nginx-rendered.XXXXXX.conf)"
+  trap 'rm -f "$tmp_conf"' RETURN
+  {
+    printf 'events {}\n'
+    printf 'http {\n'
+    printf '  include %s/%s;\n' "$PWD" "$NGINX_SUB_RENDER"
+    printf '  include %s/%s;\n' "$PWD" "$NGINX_DOMAIN_RENDER"
+    printf '}\n'
+  } > "$tmp_conf"
+  nginx -t -c "$tmp_conf" >/dev/null 2>&1 || die "nginx validation failed for rendered configs"
+  rm -f "$tmp_conf"
+  trap - RETURN
+}
+
+validate_live_configs() {
+  xray run -test -config "$XRAY_TARGET" >/dev/null 2>&1 || die "xray validation failed for live config"
+  nginx -t >/dev/null 2>&1 || die "nginx validation failed for live config"
+}
+
+reload_or_restart() {
+  service_name="$1"
+  if systemctl reload "$service_name" >/dev/null 2>&1; then
+    ok "systemctl reload $service_name"
+  else
+    systemctl restart "$service_name" >/dev/null 2>&1 || die "failed to restart $service_name"
+    ok "systemctl restart $service_name"
+  fi
+}
+
+require_root
+require_repo_root
+require_readable "$RUNTIME_ENV_FILE"
+require_cmd python3
+require_cmd xray
+require_cmd nginx
+require_cmd systemctl
+
+bash scripts/render.sh >/dev/null
+ok "render completed"
+
+bash scripts/validate.sh >/dev/null
+ok "repo validation completed"
+
+require_file "$XRAY_RENDER"
+require_file "$NGINX_SUB_RENDER"
+require_file "$NGINX_DOMAIN_RENDER"
+require_file "$XRAY_TARGET"
+require_file "$NGINX_SUB_TARGET"
+require_file "$NGINX_DOMAIN_TARGET"
+
+validate_rendered_xray
+ok "rendered xray validation completed"
+validate_rendered_nginx
+ok "rendered nginx validation completed"
+
+BACKUP_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+BACKUP_DIR="$BACKUP_ROOT/$BACKUP_ID"
+mkdir -p "$BACKUP_DIR"
+chmod 0700 "$BACKUP_DIR"
+printf 'created_by\tscripts/apply.sh\ncreated_at_utc\t%s\n' "$BACKUP_ID" > "$BACKUP_DIR/MANIFEST.tsv"
+backup_one "$XRAY_TARGET"
+backup_one "$NGINX_SUB_TARGET"
+backup_one "$NGINX_DOMAIN_TARGET"
+ok "backup_set=$BACKUP_DIR"
+
+atomic_install "$XRAY_RENDER" "$XRAY_TARGET"
+atomic_install "$NGINX_SUB_RENDER" "$NGINX_SUB_TARGET"
+atomic_install "$NGINX_DOMAIN_RENDER" "$NGINX_DOMAIN_TARGET"
+ok "managed configs replaced atomically"
+
+validate_live_configs
+ok "live config validation completed"
+
+reload_or_restart xray
+reload_or_restart nginx
+
+HEAD_SHA="$(git -c safe.directory="$PWD" rev-parse --short HEAD 2>/dev/null || true)"
+echo "DONE: controlled apply completed"
+[ -n "$HEAD_SHA" ] && echo "HEAD=$HEAD_SHA"
+echo "BACKUP_SET=$BACKUP_DIR"
