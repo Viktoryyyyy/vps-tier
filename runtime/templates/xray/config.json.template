@@ -11,12 +11,10 @@
         "clients": [
           {
             "id": "{{XRAY_CLIENT_UUID}}",
-            "flow": "xtls-rprx-vision",
             "email": "{{XRAY_CLIENT_LABEL}}"
           },
           {
             "id": "{{XRAY_CLIENT_2_UUID}}",
-            "flow": "xtls-rprx-vision",
             "email": "{{XRAY_CLIENT_2_LABEL}}"
           }
         ],
