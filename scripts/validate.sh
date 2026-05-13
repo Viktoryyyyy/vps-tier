@@ -45,6 +45,9 @@ checks = [
     (len(outbounds) == 1, "xray outbound_count must be 1"),
     (outbounds[0].get("protocol") == "freedom", "xray outbound protocol must be freedom"),
 ]
+client_flow_indexes = [str(i) for i, client in enumerate(clients) if isinstance(client, dict) and "flow" in client]
+if client_flow_indexes:
+    raise SystemExit("ERROR: xray VLESS clients must not define client-level flow; indexes " + ",".join(client_flow_indexes))
 for ok, msg in checks:
     if not ok:
         raise SystemExit("ERROR: " + msg)
