@@ -4,7 +4,6 @@
   },
   "inbounds": [
     {
-      "tag": "vless-reality-in",
       "listen": "0.0.0.0",
       "port": 443,
       "protocol": "vless",
@@ -38,10 +37,6 @@
             "{{XRAY_REALITY_SHORT_ID}}"
           ]
         }
-      },
-      "sniffing": {
-        "enabled": true,
-        "destOverride": ["http", "tls", "quic"]
       }
     }
   ],
