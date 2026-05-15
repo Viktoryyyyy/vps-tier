@@ -95,7 +95,7 @@ import re
 import sys
 
 pairs = [(sys.argv[1], sys.argv[2]), (sys.argv[3], sys.argv[4])]
-pattern = re.compile(r"\$\{([A-Z0-9_]+)\}")
+pattern = re.compile(r"\$\{([A-Za-z0-9_]+)\}")
 
 for src, dst in pairs:
     with open(src, "r", encoding="utf-8") as f:
@@ -117,7 +117,7 @@ PY
 }
 
 validate_no_unresolved_placeholders() {
-  if grep -R -n -E '\$\{[A-Z0-9_]+\}|\{\{[^}]+\}\}|__[A-Z0-9_]+__' .render/hysteria2 .render/systemd >/tmp/vps-hysteria2-placeholders.$$; then
+  if grep -R -n -E '\$\{[A-Za-z0-9_]+\}|\{\{[^}]+\}\}|__[A-Za-z0-9_]+__' .render/hysteria2 .render/systemd >/tmp/vps-hysteria2-placeholders.$$; then
     echo "ERROR: unresolved placeholders in rendered Hysteria2 files" >&2
     sed -n "1,50p" /tmp/vps-hysteria2-placeholders.$$ >&2
     rm -f /tmp/vps-hysteria2-placeholders.$$
@@ -133,7 +133,8 @@ validate_hysteria2_rendered_files() {
   grep -q '^auth:' "$HYSTERIA2_CONFIG_RENDER" || die "rendered Hysteria2 config missing auth"
   grep -q '^tls:' "$HYSTERIA2_CONFIG_RENDER" || die "rendered Hysteria2 config missing tls"
   grep -q '^ExecStart=.* server -c /etc/hysteria/server.yaml$' "$HYSTERIA2_UNIT_RENDER" || die "rendered Hysteria2 unit has unexpected ExecStart"
-  if grep -R -n -E "${path_x}|${path_n}|systemctl[[:space:]].*(${svc_x}|${svc_n})|service[[:space:]].*(${svc_x}|${svc_n})" "$HYSTERIA2_CONFIG_RENDER" "$HYSTERIA2_UNIT_RENDER" >/tmp/vps-hysteria2-scope.$$; then
+  awk '!/^[[:space:]]*#/' "$HYSTERIA2_CONFIG_RENDER" "$HYSTERIA2_UNIT_RENDER" | grep -n -E "${path_x}|${path_n}|systemctl[[:space:]].*(${svc_x}|${svc_n})|service[[:space:]].*(${svc_x}|${svc_n})" >/tmp/vps-hysteria2-scope.$$ || true
+  if [ -s /tmp/vps-hysteria2-scope.$$ ]; then
     echo "ERROR: rendered Hysteria2 files contain forbidden non-Hysteria2 scope" >&2
     sed -n "1,50p" /tmp/vps-hysteria2-scope.$$ >&2
     rm -f /tmp/vps-hysteria2-scope.$$
