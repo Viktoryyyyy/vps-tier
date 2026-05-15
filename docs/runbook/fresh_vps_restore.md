@@ -1,0 +1,319 @@
+# Fresh VPS Restore Runbook
+
+Status: documentation-only recovery runbook.
+Scope: fresh VPS restore from a clean Ubuntu baseline into the GitHub-managed render/validate/apply model.
+
+This runbook closes the recovery readiness documentation gap recorded in `docs/observed/analysis/recovery_drill_readiness_audit_2026-05-15.md`.
+
+## Non-negotiable boundaries
+
+- GitHub is the Source of Truth for managed templates, contracts, scripts, and runbooks.
+- Server is Applied State plus Observed State.
+- No secrets, private keys, full UUIDs, tokens, passwords, client credentials, or subscription URLs are committed to Git.
+- `/etc/vps-tier/runtime.env` is server-only and must be reconstructed from inventory, not from Git secrets.
+- Runtime files are changed only by approved scripts after render and validation.
+- SSH, firewall, package installation, reboot, and service mutation are operational restore actions; they are not performed by this documentation commit.
+
+## Recovery blockers closed by this runbook
+
+The audit blocker `FRESH_VPS_RESTORE_DOC_COMPLETE=no` is closed by documenting the full sequence from clean Ubuntu to client smoke tests.
+
+The audit blocker around Hysteria2 render proof is closed at the model level by making Hysteria2 render output and validation an explicit restore gate:
+
+- `scripts/render.sh` must produce `.render/hysteria2/server.yaml` and `.render/systemd/hysteria-server.service` when the Hysteria2 templates exist.
+- `scripts/validate.sh` must pass Hysteria2 placeholder, shape, and scope checks before Hysteria2 apply is eligible.
+- `scripts/apply_hysteria2.sh` remains the Hysteria2-only controlled apply path.
+- `scripts/rollback_hysteria2.sh` remains the Hysteria2-only rollback path.
+
+## Required baseline
+
+Fresh VPS target:
+
+- Ubuntu 22.04 LTS or compatible Ubuntu 22.04.x baseline.
+- Root or sudo-capable administrative access.
+- Public IP and DNS records already selected outside this runbook.
+- GitHub repository available at the approved `main` branch.
+- Server-only secrets and private material available from the operator's secure inventory, not from Git.
+
+Do not continue to apply until the operator can reconstruct every required server-only input without exposing it in chat, logs, or Git.
+
+## Phase 1 — Clean Ubuntu baseline
+
+Objective: prepare a clean host for controlled restore.
+
+Expected baseline checks:
+
+- OS release confirms Ubuntu 22.04.x.
+- Time synchronization is active.
+- Host has outbound access for package download and Git clone.
+- No unmanaged service is already bound to the intended service ports.
+- Current SSH access remains available through a separate verified session before any hardening is restored.
+
+Stop if the fresh VPS has unknown preinstalled panels, conflicting services, or unknown firewall policy.
+
+## Phase 2 — Required packages
+
+Install only operational prerequisites required for the restore model:
+
+- `git`
+- `curl` or `wget`
+- `ca-certificates`
+- `python3`
+- `nginx`
+- `certbot` and nginx certbot integration when HTTPS certificate restoration/issuance is required
+- firewall tooling used by the accepted operating model, if firewall restore is in scope
+
+Package installation is an operational action and must be executed only during an approved server restore session.
+
+## Phase 3 — Repository checkout
+
+Clone the approved GitHub repository to the server restore working directory selected by the operator.
+
+Required Git gates before any apply:
+
+- Confirm repository remote points to the approved repository.
+- Confirm branch is `main`.
+- Confirm `git rev-parse HEAD` equals the approved restore commit.
+- Confirm scripts are present and executable or runnable via `bash`.
+
+No runtime values are inferred from repository files.
+
+## Phase 4 — Xray install and baseline
+
+Objective: install Xray binary/service prerequisites without writing Git-managed runtime config by hand.
+
+Restore requirements:
+
+- Xray binary must exist and support config test via `xray run -test -config`.
+- Xray service unit must exist and be manageable by systemd.
+- Runtime target path must exist: `/usr/local/etc/xray/config.json`.
+- The target file may be a temporary valid placeholder only until controlled apply replaces it.
+
+Do not hand-edit the final managed config. The final Xray config must come from `.render/xray/config.json` through `scripts/apply.sh`.
+
+## Phase 5 — nginx and certbot restore
+
+Objective: restore nginx subscription serving and certificate availability without committing certificate material.
+
+Restore requirements:
+
+- nginx installed and `nginx -t` capable.
+- Managed nginx target paths exist before `scripts/apply.sh`:
+  - `/etc/nginx/sites-enabled/sub`
+  - `/etc/nginx/sites-enabled/sub.stferry.com`
+- Certificate state is restored or re-issued operationally outside Git.
+- Certificate private keys are never committed.
+- Subscription files are restored from secure server-only backup or regenerated by the approved provisioning process.
+
+The final managed nginx site files must come from `.render/nginx/sub.conf` and `.render/nginx/sub.stferry.com.conf` through `scripts/apply.sh`.
+
+## Phase 6 — Hysteria2 install and baseline
+
+Objective: install Hysteria2 binary/service prerequisites without changing Xray or nginx scope.
+
+Restore requirements:
+
+- Hysteria2 binary exists at the path declared in `/etc/vps-tier/runtime.env`.
+- `/etc/hysteria` exists with root-only permissions appropriate for secret-bearing config.
+- Hysteria2 service target path is `/etc/systemd/system/hysteria-server.service`.
+- Hysteria2 certificate paths declared in runtime env exist and are readable by the service.
+
+The final Hysteria2 config and unit must come from:
+
+- `.render/hysteria2/server.yaml`
+- `.render/systemd/hysteria-server.service`
+
+through `scripts/apply_hysteria2.sh` only.
+
+## Phase 7 — runtime.env reconstruction
+
+`/etc/vps-tier/runtime.env` is server-only. It must be reconstructed manually from the secure operator inventory.
+
+Minimum rules:
+
+- File path: `/etc/vps-tier/runtime.env`.
+- Owner: `root:root`.
+- Mode: `0600`.
+- Never print values to terminal output used as evidence.
+- Evidence may list variable names only.
+- Values must match the restored DNS, certificate, Xray Reality, subscription, and Hysteria2 runtime state.
+
+Required variable families:
+
+- Subscription host/port/path values used by nginx and subscription rendering.
+- Xray VLESS/Reality values required by `runtime/templates/xray`.
+- Hysteria2 values required by `templates/hysteria2/server.yaml.tpl` and `templates/systemd/hysteria-server.service.tpl`:
+  - `VPS_HYSTERIA2_ENABLED`
+  - `VPS_HYSTERIA2_PORT`
+  - `VPS_HYSTERIA2_AUTH_MODE`
+  - `VPS_HYSTERIA2_AUTH_SECRET`
+  - `VPS_HYSTERIA2_CERT_PATH`
+  - `VPS_HYSTERIA2_KEY_PATH`
+  - `VPS_HYSTERIA2_BIN_PATH`
+  - `VPS_HYSTERIA2_UP_Mbps`
+  - `VPS_HYSTERIA2_DOWN_Mbps`
+  - `VPS_HYSTERIA2_MASQUERADE_URL`
+  - `VPS_HYSTERIA2_OBFS_ENABLED`
+  - `VPS_HYSTERIA2_OBFS_PASSWORD` only when obfuscation is enabled.
+
+Do not invent missing values. Stop until secure inventory is available.
+
+## Phase 8 — Server-only secrets inventory
+
+Inventory-only proof is acceptable. Secret values are not acceptable.
+
+Expected inventory categories:
+
+- `/etc/vps-tier/runtime.env` variable names only.
+- Xray Reality private material presence only.
+- UUID/client identity counts or first8-only evidence.
+- TLS certificate and private key path presence only.
+- Telegram bot token presence only, when monitoring/bot restore is in scope.
+- SSH authorized key presence only.
+- Subscription file presence and counts only; no full URLs.
+- Hysteria2 auth secret presence only.
+
+Any restore evidence that prints full secrets fails the runbook.
+
+## Phase 9 — render, validate, apply
+
+Generic managed Xray/nginx restore gate:
+
+1. Run `scripts/render.sh` from repository root.
+2. Confirm `.render/xray/config.json` exists.
+3. Confirm `.render/nginx/sub.conf` exists.
+4. Confirm `.render/nginx/sub.stferry.com.conf` exists.
+5. Confirm `.render/hysteria2/server.yaml` exists when Hysteria2 templates are present.
+6. Confirm `.render/systemd/hysteria-server.service` exists when the Hysteria2 systemd template is present.
+7. Run `scripts/validate.sh`.
+8. Run `scripts/apply.sh` only after render and validation pass.
+
+Hysteria2 restore gate:
+
+1. Confirm `VPS_HYSTERIA2_ENABLED=true` only when Hysteria2 restore is intended.
+2. Run `scripts/render.sh` or rely on `scripts/apply_hysteria2.sh` internal render.
+3. Confirm Hysteria2 rendered files exist and contain no unresolved placeholders.
+4. Run `scripts/validate.sh` when generic restore validation is being proven.
+5. Run `scripts/apply_hysteria2.sh` only after Hysteria2 prerequisites and runtime env are complete.
+
+Expected backup roots after apply:
+
+- Xray/nginx: `/var/backups/vps-tier/apply/<UTC_TS>`.
+- Hysteria2: `/var/backups/vps-tier/hysteria2/apply/<UTC_TS>`.
+
+## Phase 10 — Firewall restore
+
+Firewall restore is an operational action after service targets are known.
+
+Expected firewall model:
+
+- Allow SSH management port before enabling or tightening firewall.
+- Allow Xray Reality TCP port.
+- Allow nginx HTTP/HTTPS subscription ports used by the accepted runtime model.
+- Allow Hysteria2 UDP port when Hysteria2 is enabled.
+- Deny unexpected inbound traffic according to the approved firewall policy.
+
+Before enabling/tightening firewall:
+
+- Verify a separate SSH session remains connected.
+- Verify intended listeners exist.
+- Verify no required restore port is omitted.
+
+Do not apply firewall changes from this documentation-only phase.
+
+## Phase 11 — SSH hardening restore
+
+SSH hardening is an operational action and must be restored only after key-based access is verified.
+
+Expected model:
+
+- Preserve an active administrative session.
+- Verify key-based login in a separate session before disabling password login or changing policy.
+- Validate sshd config before reload.
+- Reload, do not reboot, unless an approved operational phase explicitly authorizes reboot.
+- Confirm login still works after reload.
+
+Do not restore SSH hardening from this documentation-only phase.
+
+## Phase 12 — Client smoke tests
+
+Client smoke tests are required before declaring fresh VPS restore ready.
+
+Expected checks:
+
+- Xray listener is active on the intended TCP port.
+- nginx serves the subscription endpoint on the intended HTTP/HTTPS ports.
+- Hysteria2 listener is active on the intended UDP port when enabled.
+- Subscription file returns expected non-secret structure without exposing full links in evidence.
+- At least one existing client profile can connect through Xray.
+- At least one Hysteria2 client smoke test passes when Hysteria2 is enabled.
+- Service journals show no new critical errors after restore.
+
+Evidence must redact credentials and subscription URLs.
+
+## Phase 13 — Rollback expectations
+
+Rollback is available only after an apply script created a backup set.
+
+Xray/nginx rollback:
+
+- Use `scripts/rollback.sh`.
+- It restores the latest backup set under `/var/backups/vps-tier/apply`.
+- It validates backup configs before restore.
+- It atomically restores managed targets.
+- It validates live configs and reloads/restarts Xray and nginx.
+
+Hysteria2 rollback:
+
+- Use `scripts/rollback_hysteria2.sh`.
+- It restores or removes Hysteria2 managed files according to the latest Hysteria2 backup manifest.
+- It does not roll back Xray or nginx.
+- It daemon-reloads when the unit changes.
+- It restarts or stops Hysteria2 according to restored unit presence.
+
+Rollback does not reconstruct missing server-only secrets. If secrets are missing, restore from secure inventory first.
+
+## Restore readiness model
+
+`READY_FOR_DRY_RUN_DOC_ONLY=yes` when:
+
+- This runbook exists.
+- Evidence identifies no missing documentation sequence for fresh VPS restore.
+- Render and validation procedures are documented.
+- Secret handling is inventory-only.
+
+`READY_FOR_FRESH_VPS_RESTORE=yes` only when a future approved restore drill proves all of the following on a fresh VPS:
+
+- Clean Ubuntu baseline verified.
+- Required packages installed.
+- Xray installed and test-capable.
+- nginx and certbot/certificate state restored or re-issued.
+- Hysteria2 installed when enabled.
+- `/etc/vps-tier/runtime.env` reconstructed from secure inventory.
+- Server-only secrets inventory complete without disclosure.
+- `scripts/render.sh` produces Xray, nginx, and Hysteria2 rendered outputs as applicable.
+- `scripts/validate.sh` passes.
+- `scripts/apply.sh` succeeds for Xray/nginx.
+- `scripts/apply_hysteria2.sh` succeeds when Hysteria2 is enabled.
+- Firewall policy is restored and verified.
+- SSH hardening is restored and separately verified.
+- Client smoke tests pass.
+- Rollback scripts are present and backup sets are created after apply.
+
+Until a fresh VPS drill proves those runtime facts, this documentation closes the runbook gap but does not by itself declare the system freshly restored.
+
+## Documentation-only verification proof
+
+This runbook is Git-only and documentation-only.
+
+It does not:
+
+- mutate a server;
+- run runtime apply;
+- reboot;
+- change firewall policy;
+- change SSH policy;
+- install packages;
+- commit secrets;
+- generate credentials;
+- expose client credentials.
