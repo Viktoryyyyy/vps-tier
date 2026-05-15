@@ -7,7 +7,7 @@ cd "$repo_root"
 [ -d ".render" ] || { echo "ERROR: missing .render directory; run scripts/render.sh first" >&2; exit 1; }
 
 if [ -d .render/hysteria2 ] || [ -d .render/systemd ]; then
-  if grep -R -n -E '\$\{[A-Z0-9_]+\}|\{\{[^}]+\}\}|__[A-Z0-9_]+__' .render/hysteria2 .render/systemd >/tmp/vps-validate-hysteria2-placeholders.$$ 2>/dev/null; then
+  if grep -R -n -E '\$\{[A-Za-z0-9_]+\}|\{\{[^}]+\}\}|__[A-Za-z0-9_]+__' .render/hysteria2 .render/systemd >/tmp/vps-validate-hysteria2-placeholders.$$ 2>/dev/null; then
     echo "ERROR: unresolved placeholders in rendered Hysteria2 files" >&2
     sed -n "1,50p" /tmp/vps-validate-hysteria2-placeholders.$$ >&2
     rm -f /tmp/vps-validate-hysteria2-placeholders.$$
