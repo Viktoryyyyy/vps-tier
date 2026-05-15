@@ -85,12 +85,14 @@ fi
 
 [ "$found" -eq 1 ] || { echo "ERROR: no templates found under runtime/templates or Hysteria2 templates" >&2; exit 1; }
 
-if grep -R -n -E '\$\{[A-Z0-9_]+\}|\{\{[^}]+\}\}|__[A-Z0-9_]+__' "$out_dir" >/tmp/vps-render-placeholders.$$; then
-  echo "ERROR: unresolved placeholders in rendered files" >&2
-  sed -n "1,50p" /tmp/vps-render-placeholders.$$ >&2
-  rm -f /tmp/vps-render-placeholders.$$
-  exit 1
+if [ -d "$out_dir/hysteria2" ] || [ -d "$out_dir/systemd" ]; then
+  if grep -R -n -E '\$\{[A-Z0-9_]+\}|\{\{[^}]+\}\}|__[A-Z0-9_]+__' "$out_dir/hysteria2" "$out_dir/systemd" >/tmp/vps-render-hysteria2-placeholders.$$ 2>/dev/null; then
+    echo "ERROR: unresolved placeholders in rendered Hysteria2 files" >&2
+    sed -n "1,50p" /tmp/vps-render-hysteria2-placeholders.$$ >&2
+    rm -f /tmp/vps-render-hysteria2-placeholders.$$
+    exit 1
+  fi
+  rm -f /tmp/vps-render-hysteria2-placeholders.$$
 fi
-rm -f /tmp/vps-render-placeholders.$$
 
 echo "DONE: rendered repo-local files under $out_dir"
