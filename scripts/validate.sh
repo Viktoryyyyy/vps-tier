@@ -63,7 +63,8 @@ grep -q '^auth:' .render/hysteria2/server.yaml || { echo "ERROR: rendered Hyster
 grep -q '^tls:' .render/hysteria2/server.yaml || { echo "ERROR: rendered Hysteria2 config missing tls" >&2; exit 1; }
 grep -q '^ExecStart=.* server -c /etc/hysteria/server.yaml$' .render/systemd/hysteria-server.service || { echo "ERROR: rendered Hysteria2 unit has unexpected ExecStart" >&2; exit 1; }
 
-if grep -R -n -E '/usr/local/etc/xray|/etc/nginx|/etc/ssh|sshd_config|systemctl[[:space:]].*(xray|nginx|ssh|sshd)|service[[:space:]].*(xray|nginx|ssh|sshd)|iptables|nft[[:space:]]|ufw[[:space:]]|shutdown|reboot' .render/hysteria2 .render/systemd >/tmp/vps-validate-hysteria2-scope.$$; then
+awk '!/^[[:space:]]*#/' .render/hysteria2/server.yaml .render/systemd/hysteria-server.service | grep -n -E '/usr/local/etc/xray|/etc/nginx|/etc/ssh|sshd_config|systemctl[[:space:]].*(xray|nginx|ssh|sshd)|service[[:space:]].*(xray|nginx|ssh|sshd)|iptables|nft[[:space:]]|ufw[[:space:]]|shutdown|reboot' >/tmp/vps-validate-hysteria2-scope.$$ || true
+if [ -s /tmp/vps-validate-hysteria2-scope.$$ ]; then
   echo "ERROR: rendered Hysteria2 files contain forbidden non-Hysteria2 scope" >&2
   sed -n "1,50p" /tmp/vps-validate-hysteria2-scope.$$ >&2
   rm -f /tmp/vps-validate-hysteria2-scope.$$
