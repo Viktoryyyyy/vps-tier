@@ -6,7 +6,7 @@ cd "$repo_root"
 
 [ -d ".render" ] || { echo "ERROR: missing .render directory; run scripts/render.sh first" >&2; exit 1; }
 
-if grep -R -n -E "\{\{[^}]+\}\}|__[A-Z0-9_]+__" ".render" >/tmp/vps-validate-placeholders.$$; then
+if grep -R -n -E '\$\{[A-Z0-9_]+\}|\{\{[^}]+\}\}|__[A-Z0-9_]+__' ".render" >/tmp/vps-validate-placeholders.$$; then
   echo "ERROR: unresolved placeholders in .render" >&2
   sed -n "1,50p" /tmp/vps-validate-placeholders.$$ >&2
   rm -f /tmp/vps-validate-placeholders.$$
@@ -53,4 +53,21 @@ for ok, msg in checks:
         raise SystemExit("ERROR: " + msg)
 print("OK: xray structural contract .render/xray/config.json")'
 
+[ -r .render/hysteria2/server.yaml ] || { echo "ERROR: missing .render/hysteria2/server.yaml" >&2; exit 1; }
+[ -r .render/systemd/hysteria-server.service ] || { echo "ERROR: missing .render/systemd/hysteria-server.service" >&2; exit 1; }
+
+grep -q '^listen: ":' .render/hysteria2/server.yaml || { echo "ERROR: rendered Hysteria2 config missing listen" >&2; exit 1; }
+grep -q '^auth:' .render/hysteria2/server.yaml || { echo "ERROR: rendered Hysteria2 config missing auth" >&2; exit 1; }
+grep -q '^tls:' .render/hysteria2/server.yaml || { echo "ERROR: rendered Hysteria2 config missing tls" >&2; exit 1; }
+grep -q '^ExecStart=.* server -c /etc/hysteria/server.yaml$' .render/systemd/hysteria-server.service || { echo "ERROR: rendered Hysteria2 unit has unexpected ExecStart" >&2; exit 1; }
+
+if grep -R -n -E '/usr/local/etc/xray|/etc/nginx|/etc/ssh|sshd_config|systemctl[[:space:]].*(xray|nginx|ssh|sshd)|service[[:space:]].*(xray|nginx|ssh|sshd)|iptables|nft[[:space:]]|ufw[[:space:]]|shutdown|reboot' .render/hysteria2 .render/systemd >/tmp/vps-validate-hysteria2-scope.$$; then
+  echo "ERROR: rendered Hysteria2 files contain forbidden non-Hysteria2 scope" >&2
+  sed -n "1,50p" /tmp/vps-validate-hysteria2-scope.$$ >&2
+  rm -f /tmp/vps-validate-hysteria2-scope.$$
+  exit 1
+fi
+rm -f /tmp/vps-validate-hysteria2-scope.$$
+
+echo "OK: hysteria2 rendered contract .render/hysteria2/server.yaml .render/systemd/hysteria-server.service"
 echo "DONE: repo-local validation completed"
