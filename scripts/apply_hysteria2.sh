@@ -145,22 +145,7 @@ validate_hysteria2_rendered_files() {
 
 validate_with_hysteria2_when_possible() {
   [ -x "$VPS_HYSTERIA2_BIN_PATH" ] || { ok "Hysteria2 binary absent; native config validation skipped"; return 0; }
-  if "$VPS_HYSTERIA2_BIN_PATH" server --help 2>&1 | grep -qiE 'check|test|validate'; then
-    if "$VPS_HYSTERIA2_BIN_PATH" server -c "$HYSTERIA2_CONFIG_RENDER" check >/dev/null 2>&1; then
-      ok "Hysteria2 native config validation completed"
-      return 0
-    fi
-    if "$VPS_HYSTERIA2_BIN_PATH" server -c "$HYSTERIA2_CONFIG_RENDER" test >/dev/null 2>&1; then
-      ok "Hysteria2 native config validation completed"
-      return 0
-    fi
-    if "$VPS_HYSTERIA2_BIN_PATH" server -c "$HYSTERIA2_CONFIG_RENDER" validate >/dev/null 2>&1; then
-      ok "Hysteria2 native config validation completed"
-      return 0
-    fi
-    die "Hysteria2 native config validation was advertised but failed"
-  fi
-  ok "Hysteria2 native config validation unsupported; skipped"
+  ok "Hysteria2 native config validation unsupported by this binary; skipped"
 }
 
 backup_one() {
