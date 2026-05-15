@@ -52,7 +52,7 @@ def repl(match):
     key = match.group(1)
     return os.environ.get(key, match.group(0))
 
-data = re.sub(r"\$\{([A-Z0-9_]+)\}", repl, data)
+data = re.sub(r"\$\{([A-Za-z0-9_]+)\}", repl, data)
 
 os.makedirs(os.path.dirname(dst), exist_ok=True)
 with open(dst, "w", encoding="utf-8") as f:
@@ -86,7 +86,7 @@ fi
 [ "$found" -eq 1 ] || { echo "ERROR: no templates found under runtime/templates or Hysteria2 templates" >&2; exit 1; }
 
 if [ -d "$out_dir/hysteria2" ] || [ -d "$out_dir/systemd" ]; then
-  if grep -R -n -E '\$\{[A-Z0-9_]+\}|\{\{[^}]+\}\}|__[A-Z0-9_]+__' "$out_dir/hysteria2" "$out_dir/systemd" >/tmp/vps-render-hysteria2-placeholders.$$ 2>/dev/null; then
+  if grep -R -n -E '\$\{[A-Za-z0-9_]+\}|\{\{[^}]+\}\}|__[A-Za-z0-9_]+__' "$out_dir/hysteria2" "$out_dir/systemd" >/tmp/vps-render-hysteria2-placeholders.$$ 2>/dev/null; then
     echo "ERROR: unresolved placeholders in rendered Hysteria2 files" >&2
     sed -n "1,50p" /tmp/vps-render-hysteria2-placeholders.$$ >&2
     rm -f /tmp/vps-render-hysteria2-placeholders.$$
