@@ -84,7 +84,7 @@ if is_gt "$load5" "3.0" || is_gt "$load1" "4.0"; then status="CRIT"; fi
 if is_gt "$iowait_pct" "25.0"; then status="CRIT"; fi
 if is_gt "$mem_used_pct" "92.0" || is_gt "$(printf "%s" "$mem_avail_mb")" "999999"; then :; fi
 if is_gt "$mem_used_pct" "92.0" || is_gt "150" "$mem_avail_mb"; then status="CRIT"; fi
-if is_gt "$swap_used_pct" "25.0"; then status="CRIT"; fi
+if is_gt "$swap_used_pct" "50.0"; then status="CRIT"; fi
 if is_ge_int "$disk_used_pct" "90" || is_ge_int "$inode_used_pct" "85"; then status="CRIT"; fi
 if is_ge_int "$err_xray" "1" || is_ge_int "$err_nginx" "1"; then
   if [ "$status" != "CRIT" ]; then status="WARN"; fi
