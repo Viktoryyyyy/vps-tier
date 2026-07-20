@@ -1,0 +1,24 @@
+[Unit]
+Description=Backup VLESS TCP relay to Kazakhstan
+Documentation=https://github.com/Viktoryyyyy/vps-tier
+Requires=vps-backup-relay.socket
+After=vps-backup-relay.socket network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --connections-max=256 --exit-idle-time=5min 194.32.142.88:443
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+Restart=on-failure
+RestartSec=2s

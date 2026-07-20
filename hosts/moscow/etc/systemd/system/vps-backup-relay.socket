@@ -1,0 +1,13 @@
+[Unit]
+Description=Backup VLESS TCP relay listener on 8443
+Documentation=https://github.com/Viktoryyyyy/vps-tier
+
+[Socket]
+ListenStream=0.0.0.0:8443
+NoDelay=true
+KeepAlive=true
+Backlog=4096
+Service=vps-backup-relay.service
+
+[Install]
+WantedBy=sockets.target
