@@ -3,6 +3,7 @@ set -euo pipefail
 
 EXPECTED_HOST_IPV4="147.45.184.140"
 SOCKET_UNIT="vps-backup-relay.socket"
+SERVICE_UNIT="vps-backup-relay.service"
 BACKUP_ROOT="/var/backups/vps-tier/moscow-backup-relay/apply"
 
 BACKUP_DIR="${1:-}"
@@ -37,6 +38,9 @@ require_cmd git
 require_cmd ip
 require_cmd awk
 require_cmd grep
+require_cmd find
+require_cmd sort
+require_cmd tail
 require_cmd systemctl
 require_cmd nginx
 
@@ -58,7 +62,8 @@ NGINX_PID_BEFORE="$(systemctl show -p MainPID --value nginx)"
 systemctl is-active --quiet nginx || die "nginx must be active before relay rollback"
 nginx -t >/dev/null 2>&1 || die "nginx validation failed before relay rollback"
 
-systemctl disable --now "$SOCKET_UNIT" >/dev/null 2>&1 || true
+systemctl stop "$SERVICE_UNIT" "$SOCKET_UNIT" >/dev/null 2>&1 || true
+systemctl disable "$SOCKET_UNIT" >/dev/null 2>&1 || true
 while IFS=$'\t' read -r kind live_path backup_path prior_state; do
   [ "$kind" = "file" ] || continue
   restore_one "$live_path" "$backup_path" "$prior_state"
@@ -84,6 +89,7 @@ cat > "$EVIDENCE_FILE" <<EOF
 - Backup set restored: $BACKUP_DIR
 - Prior socket active state restored: ${SOCKET_ACTIVE_BEFORE:-unknown}
 - Prior socket enabled state restored: ${SOCKET_ENABLED_BEFORE:-unknown}
+- Proxy service stopped before unit restoration: yes
 - Nginx active before/after: yes
 - Nginx configuration before/after: valid
 - Nginx MainPID unchanged: yes
