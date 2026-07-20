@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 EXPECTED_HOST_IPV4="147.45.184.140"
 UPSTREAM_IPV4="194.32.142.88"
@@ -19,7 +19,7 @@ SOCKET_ENABLED_BEFORE="disabled"
 
 die() {
   echo "ERROR: $*" >&2
-  exit 1
+  return 1
 }
 
 ok() {
@@ -148,7 +148,8 @@ BACKUP_ID="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_DIR="$BACKUP_ROOT/$BACKUP_ID"
 mkdir -p "$BACKUP_DIR"
 chmod 0700 "$BACKUP_DIR"
-printf 'created_by\tscripts/apply_moscow_backup_relay.sh\ncreated_at_utc\t%s\n' "$BACKUP_ID" > "$BACKUP_DIR/MANIFEST.tsv"
+printf 'created_by\tscripts/apply_moscow_backup_relay.sh\ncreated_at_utc\t%s\nsocket_active_before\t%s\nsocket_enabled_before\t%s\n' \
+  "$BACKUP_ID" "$SOCKET_ACTIVE_BEFORE" "$SOCKET_ENABLED_BEFORE" > "$BACKUP_DIR/MANIFEST.tsv"
 backup_one "$SOCKET_TARGET"
 backup_one "$SERVICE_TARGET"
 
@@ -160,8 +161,11 @@ systemctl daemon-reload
 systemctl enable --now "$SOCKET_UNIT" >/dev/null
 sleep 1
 systemctl is-active --quiet "$SOCKET_UNIT" || die "$SOCKET_UNIT is not active"
+systemctl is-enabled --quiet "$SOCKET_UNIT" || die "$SOCKET_UNIT is not enabled"
 port_has_listener "$LISTEN_PORT" || die "tcp/$LISTEN_PORT is not listening after apply"
 timeout 5 bash -c "exec 3<>/dev/tcp/127.0.0.1/$LISTEN_PORT" || die "local relay activation test failed"
+sleep 1
+systemctl is-active --quiet "$SERVICE_UNIT" || die "$SERVICE_UNIT did not activate"
 
 systemctl is-active --quiet nginx || die "nginx is not active after relay apply"
 nginx -t >/dev/null 2>&1 || die "nginx validation failed after relay apply"
@@ -183,6 +187,7 @@ cat > "$EVIDENCE_FILE" <<EOF
 - Upstream: $UPSTREAM_IPV4:$UPSTREAM_PORT
 - Socket active: yes
 - Socket enabled: yes
+- Proxy service activation: passed
 - Upstream TCP reachable: yes
 - Local activation test: passed
 - Nginx active before/after: yes
