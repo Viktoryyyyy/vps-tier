@@ -79,7 +79,8 @@ rollback_on_error() {
   trap - ERR
   if [ "$MUTATION_STARTED" -eq 1 ] && [ -n "$BACKUP_DIR" ] && [ -f "$BACKUP_DIR/MANIFEST.tsv" ]; then
     echo "ERROR: apply failed; restoring pre-apply relay state" >&2
-    systemctl disable --now "$SOCKET_UNIT" >/dev/null 2>&1 || true
+    systemctl stop "$SERVICE_UNIT" "$SOCKET_UNIT" >/dev/null 2>&1 || true
+    systemctl disable "$SOCKET_UNIT" >/dev/null 2>&1 || true
     while IFS=$'\t' read -r kind live_path backup_path prior_state; do
       [ "$kind" = "file" ] || continue
       restore_one "$live_path" "$backup_path" "$prior_state"
