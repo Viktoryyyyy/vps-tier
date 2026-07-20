@@ -31,7 +31,7 @@ ufw_has_8443_rule() {
 }
 
 ufw_has_8443_allow() {
-  ufw status 2>/dev/null | grep -Eq '^8443/tcp[[:space:]]+ALLOW IN'
+  ufw status 2>/dev/null | grep -Eq '^[[:space:]]*8443/tcp[[:space:]]+ALLOW([[:space:]]+IN)?([[:space:]]|$)'
 }
 
 rollback_firewall_on_error() {
