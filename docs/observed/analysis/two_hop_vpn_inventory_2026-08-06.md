@@ -7,15 +7,21 @@
 - Runtime mutation in this task: none
 - Secrets recorded: none
 
-## Objective
-
-Provide a client path where the access network sees only the Moscow VPS and public Internet services see Kazakhstan as the egress location:
+This file records informational observed state only. Desired-state architecture and mandatory implementation boundaries are defined in:
 
 ```text
-client -> Moscow VPN termination -> Moscow/Kazakhstan backbone -> Kazakhstan NAT -> Internet
+contracts/two_hop_vpn/architecture_contract.md
 ```
 
-The existing raw TCP relay was retained during observation but is not considered a sufficient final architecture because it does not terminate and re-originate the client session on Moscow.
+## Investigation Context
+
+The required user outcome was a path where the access network reaches Moscow while Internet traffic exits through Kazakhstan:
+
+```text
+client -> Moscow -> Kazakhstan -> Internet
+```
+
+The investigation compared that requirement with the existing raw TCP relay and current host/network state. No VPN, routing, forwarding, NAT, firewall, DNS, or application configuration was changed.
 
 ## Existing Relay Evidence
 
@@ -36,7 +42,7 @@ Observed:
 - client authentication over the tested access network did not provide a reliable usable path;
 - direct Kazakhstan traffic was independently observed to be cut by the access provider.
 
-Conclusion: the target design must terminate the client VPN on Moscow and use a separate server-to-server tunnel to Kazakhstan.
+Investigation finding: the raw relay did not provide a reliable client path on the tested access network. The resulting desired-state decision is maintained in the architecture contract, not in this observed file.
 
 ## Moscow Host
 
@@ -91,7 +97,7 @@ moex-futures-daily-refresh.service
 blocker=registry_refresh:component_returncode_nonzero
 ```
 
-It is outside the VPN scope and was not changed.
+The unit was not changed during this inventory.
 
 ### Moscow Firewall
 
@@ -107,7 +113,7 @@ NAT_RULES=none
 
 Existing allows include SSH, Mosh, `tcp/5432`, `tcp/80`, `tcp/443`, and `tcp/8443`.
 
-Implication: the future design requires explicit IPv4 forwarding, routed UFW rules, and controlled forwarding between client and backbone interfaces. No firewall change was made during this inventory.
+Analysis finding: any routed client-to-backbone implementation would require explicit IPv4 forwarding and routed firewall rules. No firewall or forwarding change was made during this inventory.
 
 ## Kazakhstan Host
 
@@ -131,7 +137,7 @@ Relevant listeners and services:
 - Nginx: `tcp/80`, `tcp/8443`;
 - n8n Docker binding: `127.0.0.1:5678`;
 - Flowise Docker binding: `127.0.0.1:3000`;
-- cloudflared active with local management listener.
+- cloudflared active with a local management listener.
 
 Containers:
 
@@ -159,7 +165,7 @@ UFW is active with incoming deny and routed deny. Existing allows include:
 
 The FORWARD policy is DROP. Existing NAT is limited to Docker subnet masquerading.
 
-Implication: the future backbone requires an explicit WireGuard UDP listener, forward rules for the VPN client subnet, and controlled SNAT/MASQUERADE through `enp3s0`.
+Analysis finding: a future routed backbone would require an explicit UDP listener, forward rules for its approved client subnet, and controlled source NAT through `enp3s0`. No firewall, forwarding, or NAT change was made during this inventory.
 
 ## Application Access
 
@@ -180,8 +186,8 @@ Flowise /=HTTP 200
 
 Public route observations:
 
-- `flowise.foods-tech.store` resolves through Cloudflare and returns HTTPS 200;
-- `flowise-api.foods-tech.store` resolves directly to Moscow and returns HTTPS 200 through the compatibility route;
+- `flowise.foods-tech.store` resolved through Cloudflare and returned HTTPS 200;
+- `flowise-api.foods-tech.store` resolved directly to Moscow and returned HTTPS 200 through the compatibility route;
 - `n8n.foods-tech.store` did not have a working public DNS route during observation.
 
 Moscow compatibility route:
@@ -191,72 +197,39 @@ flowise-api.foods-tech.store /github-task -> 127.0.0.1:8081/github-task
 other requests -> https://194.32.142.88:8443
 ```
 
-The compatibility route is classified as legacy. It must not be removed as part of the VPN implementation. Decommission requires a separate Git-managed task after dependency verification.
+The route was identified as a legacy compatibility dependency. It remained active and unchanged during the inventory. Desired-state preservation and decommission boundaries are defined in the architecture contract.
 
-Target application-access direction:
+## Additional Observed Findings
 
-- retain `flowise.foods-tech.store` through Cloudflare;
-- publish n8n through a distinct Cloudflare Tunnel hostname;
-- retire the Moscow Flowise compatibility route in a separate task;
-- do not make public n8n or Flowise availability depend on the client VPN.
+The following conditions were observed but not changed:
 
-## Target Architecture Constraints
+- PostgreSQL exposed on `tcp/5432`;
+- Zabbix agent exposed on `tcp/10050`;
+- Moscow restart requirement pending;
+- repeated MOEX futures refresh failure;
+- Flowise compatibility proxy still active;
+- n8n public DNS route absent;
+- raw relay still active.
 
-The architecture contract must preserve these boundaries:
+These findings do not authorize remediation in this task.
+
+## Desired-State Reference
+
+Authoritative architecture, fail-closed behavior, protected-service scope, address candidates, secret handling, staged delivery, and acceptance criteria are defined in:
 
 ```text
-CLIENT_INGRESS_HOST=Moscow
-CLIENT_INGRESS_PROTOCOL=UDP
-PREFERRED_CLIENT_PORT=443
-BACKBONE=Moscow_to_Kazakhstan
-EGRESS_HOST=Kazakhstan
-CLIENT_IPV4_SUBNET=10.71.0.0/24_candidate
-BACKBONE_IPV4_SUBNET=10.70.0.0/30_candidate
-MOSCOW_BACKBONE_IPV4=10.70.0.1_candidate
-KAZAKHSTAN_BACKBONE_IPV4=10.70.0.2_candidate
-DNS_PATH=through_Kazakhstan
-IPV6_INITIAL_POLICY=fail_closed
-MOSCOW_EGRESS_FALLBACK=forbidden
+contracts/two_hop_vpn/architecture_contract.md
 ```
-
-Candidate implementation sequence:
-
-1. Add server-to-server WireGuard backbone without changing either host's default route.
-2. Validate backbone reachability and persistence.
-3. Add Kazakhstan forwarding and NAT for the future client subnet.
-4. Add Moscow client VPN termination on `udp/443`.
-5. Add policy routing so client traffic can use only the Kazakhstan backbone.
-6. Generate the iPhone client profile without committing private keys.
-7. Prove public egress IP, DNS path, IPv6 fail-closed behavior, application availability, and rollback.
-8. Retire the raw relay only in a later cleanup task.
-
-## Fail-Closed Requirements
-
-- Client traffic must not fall back to Moscow public egress when the backbone is unavailable.
-- IPv6 must not escape outside the managed path during the initial IPv4-only implementation.
-- SSH, Nginx, PostgreSQL, MOEX Bot, Xray, Hysteria2, n8n, Flowise, Docker networking, and the existing relay must remain unchanged during backbone-only stages.
-- Private keys, preshared keys, client profiles, Cloudflare tokens, UUIDs, and credential-bearing URLs must remain outside Git and evidence output.
-- Every runtime apply must have an explicit backup set, rollback procedure, and post-apply evidence.
-
-## Separate Findings Outside Current Scope
-
-The following require separate security or maintenance tasks and must not be bundled with the VPN implementation:
-
-- public exposure of PostgreSQL on `tcp/5432`;
-- public exposure of Zabbix agent on `tcp/10050`;
-- pending Moscow reboot requirement;
-- repeated MOEX futures refresh failure;
-- Flowise compatibility proxy decommission;
-- n8n Cloudflare Tunnel publication;
-- raw relay decommission.
 
 ## Inventory Verdict
 
 ```text
 OBSERVED_INVENTORY=complete
 RUNTIME_MUTATION=none
-TARGET_ARCHITECTURE=client_termination_on_Moscow_plus_dedicated_backbone
+RAW_RELAY_TESTED=yes
+RAW_RELAY_RELIABLE_FOR_TESTED_CLIENT_PATH=no
 BACKBONE_IMPLEMENTATION_STATUS=not_started
 CLIENT_INGRESS_IMPLEMENTATION_STATUS=not_started
 APPLICATION_ACCESS_CHANGES=not_started
+DESIRED_STATE_SOURCE=contracts/two_hop_vpn/architecture_contract.md
 ```
