@@ -36,7 +36,9 @@ Verification performed on 2026-08-06 against upstream project sources:
 
 - the official `amneziawg-tools` repository publishes release `v1.0.20260223` and identifies it as the latest release;
 - the release history includes AWG 2 support and later AWG 2 parameter fixes;
-- the official Amnezia Launchpad PPA publishes Noble packages for both `amneziawg` and `amneziawg-linux-kmod`;
+- the official Amnezia Launchpad PPA publishes Noble source packages `amneziawg` and `amneziawg-linux-kmod`;
+- the installable binary package produced from `amneziawg-linux-kmod` is `amneziawg-dkms`;
+- the `amneziawg` binary package depends on `amneziawg-dkms` or a compatible prebuilt module package;
 - the official AmneziaWG iOS application reports AWG 2 support in the 2.x release line;
 - the iOS application is available for iPhone and iPad.
 
@@ -45,6 +47,7 @@ Reference sources:
 ```text
 https://github.com/amnezia-vpn/amneziawg-tools/releases
 https://github.com/amnezia-vpn/amneziawg-tools
+https://github.com/amnezia-vpn/amneziawg-linux-kernel-module
 https://launchpad.net/~amnezia/+archive/ubuntu/ppa
 https://launchpad.net/~amnezia/+ppa-packages
 https://apps.apple.com/app/amneziawg/id6478942365
@@ -87,13 +90,22 @@ COMPONENT=main
 SIGNING_KEY_FINGERPRINT=75C9DD72C799870E310542E24166F2C257290828
 ```
 
-Planned packages:
+Planned installable binary packages:
 
 ```text
 dkms
 amneziawg
-amneziawg-linux-kmod
+amneziawg-dkms
 ```
+
+Package identity distinction:
+
+```text
+SOURCE_PACKAGE_FOR_KERNEL_MODULE=amneziawg-linux-kmod
+INSTALLABLE_BINARY_DKMS_PACKAGE=amneziawg-dkms
+```
+
+The source-package name `amneziawg-linux-kmod` must not be passed to `apt install`.
 
 The PPA is a third-party software source, not an Ubuntu archive component. The implementation must therefore fail closed unless it proves all of the following before installation:
 
@@ -102,8 +114,9 @@ The PPA is a third-party software source, not an Ubuntu archive component. The i
 - running-kernel headers are installed;
 - the imported signing key fingerprint exactly matches the approved fingerprint;
 - the configured source URI, suite, and component exactly match this contract;
-- `apt-cache policy` shows package candidates from the approved source;
+- `apt-cache policy` shows installable candidates for `amneziawg` and `amneziawg-dkms` from the approved source;
 - package names and candidate versions are captured in non-secret pre-apply evidence;
+- package metadata proves that the selected `amneziawg` package is compatible with the selected DKMS or module package;
 - no existing Amnezia source or package ownership conflict exists.
 
 Do not use `apt-key`. The later implementation must use a dedicated keyring and a source entry bound with `signed-by`.
@@ -115,7 +128,7 @@ The planning baseline observed upstream on 2026-08-06 includes:
 ```text
 AMNEZIAWG_TOOLS_RELEASE=v1.0.20260223
 NOBLE_AMNEZIAWG_BUILD=20260223_generation
-NOBLE_KMOD_BUILD=20260210_generation
+NOBLE_DKMS_SOURCE_BUILD=20260210_generation
 IOS_APP_LINE=2.x_with_AWG2_support
 ```
 
@@ -197,6 +210,7 @@ UPSTREAM_SUPPORT=verified_as_of_2026-08-06
 CLIENT_INGRESS_TECHNOLOGY=AmneziaWG_2
 BACKBONE_TECHNOLOGY=standard_WireGuard
 PACKAGE_SOURCE_TRUST_BOUNDARY=defined
+INSTALLABLE_DKMS_PACKAGE=amneziawg-dkms
 PACKAGE_APPLY_SCOPE=toolchain_only
 RUNTIME_MUTATION=none
 SECRETS_IN_GIT=none
