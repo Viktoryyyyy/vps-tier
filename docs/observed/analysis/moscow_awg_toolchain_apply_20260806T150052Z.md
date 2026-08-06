@@ -1,0 +1,27 @@
+# Moscow AmneziaWG Toolchain — Apply Evidence
+
+- UTC: 2026-08-06T15:01:25Z
+- Git HEAD: 3605748e46380e047801f436597f2eec745651cd
+- Host IPv4: 147.45.184.140
+- OS: ubuntu 24.04 noble
+- Kernel: 6.8.0-85-generic
+- Kernel headers: linux-headers-6.8.0-85-generic
+- Signing-key fingerprint: 75C9DD72C799870E310542E24166F2C257290828
+- APT source: https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu noble main
+- amneziawg candidate: 1.0.20210914-0~202608051617+9f70177~ubuntu24.04.1
+- amneziawg-dkms candidate: 1.0.0-0~202608051436+ce16310~ubuntu24.04.1
+- amneziawg installed version: 1.0.20210914-0~202608051617+9f70177~ubuntu24.04.1
+- amneziawg-dkms installed version: 1.0.0-0~202608051436+ce16310~ubuntu24.04.1
+- dkms installed version: 3.0.11-1ubuntu13
+- DKMS build for running kernel: passed
+- awg command: present
+- awg-quick command: present
+- Module load/unload test: passed
+- AWG interface created: no
+- UDP/443 changed: no
+- Firewall, forwarding, and route state changed: no
+- Protected units active before/after: yes
+- Reboot-required before/after: yes/yes
+- Kazakhstan server changed: no
+- Backup set: /var/backups/vps-tier/moscow-awg-toolchain/apply/20260806T150052Z
+- Secrets recorded: no
