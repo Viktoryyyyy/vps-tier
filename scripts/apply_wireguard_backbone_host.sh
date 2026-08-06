@@ -1,0 +1,294 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROLE="${1:-}"
+SOURCE_HEAD="${VPS_TIER_SOURCE_HEAD:-}"
+INTERFACE="wg-backbone"
+PORT="51820"
+BACKBONE_SUBNET="10.70.0.0/30"
+PRIVATE_KEY_FILE="/etc/wireguard/vps-tier/backbone.key"
+PUBLIC_KEY_FILE="/etc/wireguard/vps-tier/backbone.pub"
+TARGET_CONF="/etc/wireguard/${INTERFACE}.conf"
+UNIT="wg-quick@${INTERFACE}.service"
+STATE_DIR="/var/lib/vps-tier/wireguard-backbone/${ROLE}"
+STATE_FILE="${STATE_DIR}/state.env"
+EVIDENCE_FILE="${STATE_DIR}/evidence.md"
+PUBLIC_RULE_MARKER="${STATE_DIR}/ufw-public-rule.created"
+PEER_RULE_MARKER="${STATE_DIR}/ufw-peer-rule.created"
+BACKUP_ROOT="/var/backups/vps-tier/wireguard-backbone/${ROLE}/apply"
+BACKUP_DIR=""
+TMP_DIR=""
+MUTATION_STARTED=0
+
+case "$ROLE" in
+  moscow)
+    EXPECTED_IPV4="147.45.184.140"
+    EXPECTED_CODENAME="noble"
+    LOCAL_ADDRESS="10.70.0.1/30"
+    LOCAL_TUNNEL_IPV4="10.70.0.1"
+    PEER_TUNNEL_IPV4="10.70.0.2"
+    LOCAL_PUBLIC_KEY="tfSZHDDhIcgim4s6fujmel13vSvThM1Q5EAq/lK8kDQ="
+    PEER_PUBLIC_KEY="SXeu14QxklfRSCu7r/ePgYYPwasKobsk8jUWAsIeGhs="
+    PEER_PUBLIC_IPV4="194.32.142.88"
+    ENDPOINT_LINE="Endpoint = 194.32.142.88:51820"
+    KEEPALIVE_LINE="PersistentKeepalive = 25"
+    REQUIRED_UNITS=(ssh.socket nginx.service postgresql.service flowise-proxy.service vps-backup-relay.socket)
+    TRACKED_UNITS=(ssh.socket nginx.service postgresql.service flowise-proxy.service vps-backup-relay.socket)
+    HANDSHAKE_REQUIRED=yes
+    ;;
+  kazakhstan)
+    EXPECTED_IPV4="194.32.142.88"
+    EXPECTED_CODENAME="jammy"
+    LOCAL_ADDRESS="10.70.0.2/30"
+    LOCAL_TUNNEL_IPV4="10.70.0.2"
+    PEER_TUNNEL_IPV4="10.70.0.1"
+    LOCAL_PUBLIC_KEY="SXeu14QxklfRSCu7r/ePgYYPwasKobsk8jUWAsIeGhs="
+    PEER_PUBLIC_KEY="tfSZHDDhIcgim4s6fujmel13vSvThM1Q5EAq/lK8kDQ="
+    PEER_PUBLIC_IPV4="147.45.184.140"
+    ENDPOINT_LINE=""
+    KEEPALIVE_LINE=""
+    REQUIRED_UNITS=(ssh.service nginx.service docker.service)
+    TRACKED_UNITS=(ssh.service nginx.service docker.service xray.service hysteria-server.service cloudflared.service)
+    HANDSHAKE_REQUIRED=no
+    ;;
+  *)
+    echo "ERROR: role must be moscow or kazakhstan" >&2
+    exit 1
+    ;;
+esac
+
+fail() {
+  echo "ERROR: $*" >&2
+  return 1
+}
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || fail "missing command: $1"
+}
+
+host_has_expected_ipv4() {
+  ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | grep -Fx "$EXPECTED_IPV4" >/dev/null
+}
+
+ufw_active() {
+  ufw status 2>/dev/null | grep -x 'Status: active' >/dev/null
+}
+
+ufw_marker_present() {
+  marker="$1"
+  ufw status numbered 2>/dev/null | grep -F "$marker" >/dev/null
+}
+
+snapshot_units() {
+  out="$1"
+  : > "$out"
+  for unit in "${TRACKED_UNITS[@]}"; do
+    printf 'UNIT=%s\n' "$unit" >> "$out"
+    systemctl show "$unit" -p LoadState -p ActiveState -p SubState -p MainPID --no-pager 2>/dev/null >> "$out" || true
+  done
+}
+
+assert_required_units_active() {
+  for unit in "${REQUIRED_UNITS[@]}"; do
+    systemctl is-active --quiet "$unit" || fail "protected unit is not active: $unit"
+  done
+}
+
+remove_managed_ufw_rules() {
+  if [ -f "$PEER_RULE_MARKER" ]; then
+    ufw --force delete allow in on "$INTERFACE" from "$PEER_TUNNEL_IPV4" to "$LOCAL_TUNNEL_IPV4" >/dev/null 2>&1 || true
+    rm -f "$PEER_RULE_MARKER"
+  fi
+  if [ -f "$PUBLIC_RULE_MARKER" ]; then
+    ufw --force delete allow from "$PEER_PUBLIC_IPV4" to any port "$PORT" proto udp >/dev/null 2>&1 || true
+    rm -f "$PUBLIC_RULE_MARKER"
+  fi
+}
+
+rollback_on_error() {
+  rc=$?
+  trap - ERR
+  echo "ERROR: WireGuard backbone apply failed; reverting task-owned runtime changes" >&2
+  if [ "$MUTATION_STARTED" -eq 1 ]; then
+    systemctl disable --now "$UNIT" >/dev/null 2>&1 || true
+    ip link delete "$INTERFACE" >/dev/null 2>&1 || true
+    rm -f "$TARGET_CONF"
+    remove_managed_ufw_rules
+    rm -rf "$STATE_DIR"
+  fi
+  [ -z "$TMP_DIR" ] || rm -rf "$TMP_DIR"
+  exit "$rc"
+}
+
+[ "${EUID:-$(id -u)}" -eq 0 ] || fail "run as root"
+[[ "$SOURCE_HEAD" =~ ^[0-9a-f]{40}$ ]] || fail "VPS_TIER_SOURCE_HEAD must be a full lowercase commit SHA"
+
+for cmd in awk cmp cut date dpkg grep install ip iptables-save mktemp ping sed sha256sum ss stat sysctl systemctl tr ufw wg wg-quick; do
+  require_cmd "$cmd"
+done
+
+host_has_expected_ipv4 || fail "host identity mismatch; expected IPv4 $EXPECTED_IPV4"
+. /etc/os-release
+[ "${ID:-}" = "ubuntu" ] || fail "OS mismatch: ${ID:-unknown}"
+[ "${VERSION_CODENAME:-}" = "$EXPECTED_CODENAME" ] || fail "suite mismatch: ${VERSION_CODENAME:-unknown}"
+[ "$(dpkg --print-architecture)" = "amd64" ] || fail "architecture mismatch"
+
+[ -f "/var/lib/vps-tier/wireguard-tools/${ROLE}/state.env" ] || fail "WireGuard tools managed state is absent"
+[ -r "$PRIVATE_KEY_FILE" ] || fail "private key file is missing or unreadable"
+[ -r "$PUBLIC_KEY_FILE" ] || fail "public key file is missing or unreadable"
+[ "$(stat -c '%U:%G' "$PRIVATE_KEY_FILE")" = "root:root" ] || fail "private key ownership must be root:root"
+[ "$(stat -c '%a' "$PRIVATE_KEY_FILE")" = "600" ] || fail "private key mode must be 600"
+
+DERIVED_PUBLIC_KEY="$(wg pubkey < "$PRIVATE_KEY_FILE")"
+[ "$DERIVED_PUBLIC_KEY" = "$LOCAL_PUBLIC_KEY" ] || fail "local private key does not match approved public key"
+[ "$(tr -d '\r\n' < "$PUBLIC_KEY_FILE")" = "$LOCAL_PUBLIC_KEY" ] || fail "public key file does not match approved public key"
+
+[ ! -e "$STATE_DIR" ] || fail "managed backbone state already exists: $STATE_DIR"
+[ ! -e "$TARGET_CONF" ] || fail "WireGuard backbone config already exists outside this task"
+! ip link show "$INTERFACE" >/dev/null 2>&1 || fail "WireGuard backbone interface already exists"
+! systemctl is-active --quiet "$UNIT" || fail "WireGuard backbone unit is already active"
+! systemctl is-enabled --quiet "$UNIT" || fail "WireGuard backbone unit is already enabled"
+ss -H -lunp "sport = :$PORT" | grep . >/dev/null && fail "udp/$PORT is occupied"
+ip -4 route show | grep -F "$BACKBONE_SUBNET" >/dev/null && fail "backbone route already exists"
+ufw_active || fail "UFW must be active"
+ufw status numbered | grep -E "51820/udp|${INTERFACE}|vps-tier-wg-backbone" >/dev/null && \
+  fail "an unmanaged backbone-related UFW rule already exists"
+
+assert_required_units_active
+BACKUP_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+BACKUP_DIR="$BACKUP_ROOT/$BACKUP_ID"
+mkdir -p "$BACKUP_DIR" "$STATE_DIR"
+chmod 0700 "$BACKUP_DIR" "$STATE_DIR"
+DEFAULT_ROUTE_BEFORE="$(ip -4 route show default)"
+IP_FORWARD_BEFORE="$(sysctl -n net.ipv4.ip_forward)"
+IPV6_FORWARD_BEFORE="$(sysctl -n net.ipv6.conf.all.forwarding)"
+iptables-save -t nat > "$BACKUP_DIR/nat.before"
+snapshot_units "$BACKUP_DIR/units.before"
+
+TMP_DIR="$(mktemp -d /tmp/vps-tier-wg-backbone.XXXXXX)"
+chmod 0700 "$TMP_DIR"
+TMP_CONF="$TMP_DIR/${INTERFACE}.conf"
+: > "$TMP_CONF"
+chmod 0600 "$TMP_CONF"
+PRIVATE_KEY="$(tr -d '\r\n' < "$PRIVATE_KEY_FILE")"
+{
+  printf '[Interface]\n'
+  printf 'Address = %s\n' "$LOCAL_ADDRESS"
+  printf 'ListenPort = %s\n' "$PORT"
+  printf 'PrivateKey = %s\n' "$PRIVATE_KEY"
+  printf '\n[Peer]\n'
+  printf 'PublicKey = %s\n' "$PEER_PUBLIC_KEY"
+  printf 'AllowedIPs = %s/32\n' "$PEER_TUNNEL_IPV4"
+  [ -z "$ENDPOINT_LINE" ] || printf '%s\n' "$ENDPOINT_LINE"
+  [ -z "$KEEPALIVE_LINE" ] || printf '%s\n' "$KEEPALIVE_LINE"
+} > "$TMP_CONF"
+unset PRIVATE_KEY
+wg-quick strip "$TMP_CONF" >/dev/null
+
+trap rollback_on_error ERR
+MUTATION_STARTED=1
+
+ufw allow from "$PEER_PUBLIC_IPV4" to any port "$PORT" proto udp comment 'vps-tier-wg-backbone-public' >/dev/null
+printf 'owner=vps-tier\n' > "$PUBLIC_RULE_MARKER"
+ufw_marker_present 'vps-tier-wg-backbone-public' || fail "failed to verify public UDP UFW rule"
+
+install -o root -g root -m 0600 "$TMP_CONF" "$TARGET_CONF"
+rm -rf "$TMP_DIR"
+TMP_DIR=""
+TMP_CONF=""
+systemctl enable --now "$UNIT" >/dev/null
+
+systemctl is-active --quiet "$UNIT" || fail "$UNIT is not active"
+systemctl is-enabled --quiet "$UNIT" || fail "$UNIT is not enabled"
+ip link show "$INTERFACE" >/dev/null 2>&1 || fail "backbone interface is absent"
+ip -4 addr show dev "$INTERFACE" | grep -F "$LOCAL_ADDRESS" >/dev/null || fail "local backbone address is absent"
+ip -4 route show | grep -E "^${BACKBONE_SUBNET//./\.} dev ${INTERFACE}([[:space:]]|$)" >/dev/null || fail "backbone connected route is absent"
+[ "$(wg show "$INTERFACE" public-key)" = "$LOCAL_PUBLIC_KEY" ] || fail "runtime public key mismatch"
+wg show "$INTERFACE" peers | grep -Fx "$PEER_PUBLIC_KEY" >/dev/null || fail "approved peer is absent"
+wg show "$INTERFACE" allowed-ips | grep -F "$PEER_PUBLIC_KEY" | grep -F "$PEER_TUNNEL_IPV4/32" >/dev/null || fail "peer AllowedIPs mismatch"
+[ "$(wg show "$INTERFACE" listen-port)" = "$PORT" ] || fail "listen port mismatch"
+
+ufw allow in on "$INTERFACE" from "$PEER_TUNNEL_IPV4" to "$LOCAL_TUNNEL_IPV4" comment 'vps-tier-wg-backbone-peer' >/dev/null
+printf 'owner=vps-tier\n' > "$PEER_RULE_MARKER"
+ufw_marker_present 'vps-tier-wg-backbone-peer' || fail "failed to verify tunnel-peer UFW rule"
+
+HANDSHAKE_STATUS=deferred
+PING_STATUS=deferred
+if [ "$HANDSHAKE_REQUIRED" = yes ]; then
+  PING_STATUS=failed
+  for _ in 1 2 3 4 5; do
+    if ping -c 1 -W 2 "$PEER_TUNNEL_IPV4" >/dev/null 2>&1; then
+      PING_STATUS=passed
+      break
+    fi
+    sleep 1
+  done
+  [ "$PING_STATUS" = passed ] || fail "backbone peer ping failed"
+  LATEST_HANDSHAKE="$(wg show "$INTERFACE" latest-handshakes | awk -v key="$PEER_PUBLIC_KEY" '$1==key {print $2}')"
+  [ -n "$LATEST_HANDSHAKE" ] && [ "$LATEST_HANDSHAKE" -gt 0 ] || fail "WireGuard handshake was not observed"
+  HANDSHAKE_STATUS=passed
+fi
+
+[ "$(ip -4 route show default)" = "$DEFAULT_ROUTE_BEFORE" ] || fail "default route changed"
+[ "$(sysctl -n net.ipv4.ip_forward)" = "$IP_FORWARD_BEFORE" ] || fail "IPv4 forwarding changed"
+[ "$(sysctl -n net.ipv6.conf.all.forwarding)" = "$IPV6_FORWARD_BEFORE" ] || fail "IPv6 forwarding changed"
+iptables-save -t nat > "$BACKUP_DIR/nat.after"
+cmp -s "$BACKUP_DIR/nat.before" "$BACKUP_DIR/nat.after" || fail "NAT table changed"
+snapshot_units "$BACKUP_DIR/units.after"
+cmp -s "$BACKUP_DIR/units.before" "$BACKUP_DIR/units.after" || fail "protected unit state changed"
+assert_required_units_active
+
+cat > "$STATE_FILE" <<STATE
+owner=vps-tier
+role=$ROLE
+source_head=$SOURCE_HEAD
+applied_at_utc=$BACKUP_ID
+backup_set=$BACKUP_DIR
+interface=$INTERFACE
+address=$LOCAL_ADDRESS
+peer_tunnel_ipv4=$PEER_TUNNEL_IPV4
+listen_port=$PORT
+public_rule_owned=yes
+peer_rule_owned=yes
+STATE
+chmod 0600 "$STATE_FILE"
+
+cat > "$EVIDENCE_FILE" <<EVIDENCE
+# $ROLE WireGuard Backbone — Apply Evidence
+
+- UTC: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+- Source Git HEAD: $SOURCE_HEAD
+- Host IPv4: $EXPECTED_IPV4
+- Interface: $INTERFACE
+- Local address: $LOCAL_ADDRESS
+- Peer tunnel IPv4: $PEER_TUNNEL_IPV4
+- Listen port: udp/$PORT
+- Local public key verified: yes
+- Peer public key verified: yes
+- UFW public peer rule: managed
+- UFW tunnel peer rule: managed
+- Interface active and enabled: yes
+- Connected route: $BACKBONE_SUBNET
+- Default route changed: no
+- IPv4 forwarding changed: no
+- IPv6 forwarding changed: no
+- NAT table changed: no
+- Protected unit state changed: no
+- Ping status: $PING_STATUS
+- Handshake status: $HANDSHAKE_STATUS
+- Backup set: $BACKUP_DIR
+- Secrets recorded: no
+EVIDENCE
+chmod 0600 "$EVIDENCE_FILE"
+
+trap - ERR
+MUTATION_STARTED=0
+
+echo "DONE: WireGuard backbone host applied and validated"
+echo "ROLE=$ROLE"
+echo "INTERFACE=$INTERFACE"
+echo "ADDRESS=$LOCAL_ADDRESS"
+echo "PING_STATUS=$PING_STATUS"
+echo "HANDSHAKE_STATUS=$HANDSHAKE_STATUS"
+echo "EVIDENCE_FILE=$EVIDENCE_FILE"
+echo "BACKUP_SET=$BACKUP_DIR"
