@@ -60,12 +60,12 @@ apt_with_probe_config() {
 candidate_for() {
   pkg="$1"
   apt_with_probe_config apt-cache policy "$pkg" |
-    awk '/^[[:space:]]*Candidate:/ {print $2; exit}'
+    awk '/^[[:space:]]*Candidate:/ && !found {print $2; found=1}'
 }
 
 [ "${EUID:-$(id -u)}" -eq 0 ] || die "run as root"
 
-for cmd in git ip awk grep cut curl gpg apt-get apt-cache dpkg-query dpkg-deb sha256sum find sort cmp mktemp; do
+for cmd in git ip awk grep cut curl gpg apt-get apt-cache dpkg-query dpkg-deb sha256sum find sort cmp mktemp modinfo; do
   require_cmd "$cmd"
 done
 
@@ -87,8 +87,8 @@ for pkg in "${PACKAGES[@]}"; do
   package_installed "$pkg" && die "package already installed: $pkg"
 done
 
-if grep -RhsE '^[[:space:]]*deb(-src)? .*ppa\.launchpadcontent\.net/amnezia/ppa/ubuntu' \
-  /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null | grep -q .; then
+if grep -RhsEq '^[[:space:]]*deb(-src)? .*ppa\.launchpadcontent\.net/amnezia/ppa/ubuntu' \
+  /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
   die "persistent Amnezia PPA source already exists"
 fi
 
@@ -116,7 +116,7 @@ curl --fail --silent --show-error --location \
 gpg --batch --homedir "$GNUPGHOME" --import "$KEY_ASC" >/dev/null 2>&1
 ACTUAL_FINGERPRINT="$(
   gpg --batch --homedir "$GNUPGHOME" --with-colons --fingerprint "$SIGNING_KEY_FINGERPRINT" |
-    awk -F: '$1=="fpr" {print toupper($10); exit}'
+    awk -F: '$1=="fpr" && !found {print toupper($10); found=1}'
 )"
 [ "$ACTUAL_FINGERPRINT" = "$SIGNING_KEY_FINGERPRINT" ] || \
   die "signing-key fingerprint mismatch: $ACTUAL_FINGERPRINT"
@@ -172,7 +172,7 @@ AMNEZIAWG_DKMS_PACKAGE_ARCH="$(dpkg-deb -f "$AMNEZIAWG_DKMS_DEB" Architecture)"
 [ "$AMNEZIAWG_DKMS_PACKAGE_NAME" = "amneziawg-dkms" ] || die "unexpected package identity: $AMNEZIAWG_DKMS_PACKAGE_NAME"
 printf '%s\n' "$AMNEZIAWG_DEPENDS" | grep -Eq 'amneziawg-dkms|amneziawg-modules' || \
   die "amneziawg dependency does not reference a supported module package"
-dpkg-deb -c "$AMNEZIAWG_DKMS_DEB" | grep -Eq 'usr/src/amneziawg-[^/]+/' || \
+dpkg-deb -c "$AMNEZIAWG_DKMS_DEB" | grep -E 'usr/src/amneziawg-[^/]+/' >/dev/null || \
   die "amneziawg-dkms package does not contain an expected /usr/src module tree"
 
 AMNEZIAWG_SHA256="$(sha256sum "$AMNEZIAWG_DEB" | awk '{print $1}')"
