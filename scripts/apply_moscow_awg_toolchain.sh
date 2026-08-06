@@ -39,11 +39,11 @@ require_cmd() {
 }
 
 host_has_expected_ipv4() {
-  ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | grep -Fxq "$EXPECTED_HOST_IPV4"
+  ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | grep -Fx "$EXPECTED_HOST_IPV4" >/dev/null
 }
 
 package_installed() {
-  dpkg-query -W -f='${Status}\n' "$1" 2>/dev/null | grep -qx 'install ok installed'
+  dpkg-query -W -f='${Status}\n' "$1" 2>/dev/null | grep -x 'install ok installed' >/dev/null
 }
 
 snapshot_packages() {
@@ -127,7 +127,7 @@ done
 command -v awg >/dev/null 2>&1 && die "awg command already exists"
 command -v awg-quick >/dev/null 2>&1 && die "awg-quick command already exists"
 modinfo amneziawg >/dev/null 2>&1 && die "amneziawg module already exists"
-ss -H -lunp 'sport = :443' | grep -q . && die "udp/443 is no longer free"
+ss -H -lunp 'sport = :443' | grep . >/dev/null && die "udp/443 is no longer free"
 assert_protected_units_active
 
 FIREWALL_ROUTE_HASH_BEFORE="$(snapshot_firewall_routes)"
@@ -177,7 +177,7 @@ install -o root -g root -m 0644 "$SOURCE_TMP" "$SOURCE_FILE"
 apt-get update >/dev/null
 
 for pkg in amneziawg amneziawg-dkms; do
-  apt-cache policy "$pkg" | grep -Fq "$PPA_URI" || die "$pkg candidate is not from approved PPA"
+  apt-cache policy "$pkg" | grep -F "$PPA_URI" >/dev/null || die "$pkg candidate is not from approved PPA"
 done
 
 AMNEZIAWG_CANDIDATE="$(apt-cache policy amneziawg | awk '/^[[:space:]]*Candidate:/ {print $2; exit}')"
@@ -192,16 +192,16 @@ command -v dkms >/dev/null 2>&1 || die "dkms command missing after install"
 command -v awg >/dev/null 2>&1 || die "awg command missing after install"
 command -v awg-quick >/dev/null 2>&1 || die "awg-quick command missing after install"
 modinfo amneziawg >/dev/null 2>&1 || die "amneziawg module metadata missing"
-dkms status | grep -F 'amneziawg/' | grep -F "$(uname -r)" | grep -Fq ': installed' || \
+dkms status | grep -F 'amneziawg/' | grep -F "$(uname -r)" | grep -F ': installed' >/dev/null || \
   die "DKMS module is not installed for running kernel"
 
-ip -o link show | grep -Eiq '(^|: )[[:alnum:]_.-]*(awg|amnezia)' && die "unexpected AWG interface exists before module test"
+ip -o link show | grep -Ei '(^|: )[[:alnum:]_.-]*(awg|amnezia)' >/dev/null && die "unexpected AWG interface exists before module test"
 modprobe amneziawg
-lsmod | grep -q '^amneziawg ' || die "module load test failed"
+lsmod | grep '^amneziawg ' >/dev/null || die "module load test failed"
 modprobe -r amneziawg
-lsmod | grep -q '^amneziawg ' && die "module remained loaded after validation"
+lsmod | grep '^amneziawg ' >/dev/null && die "module remained loaded after validation"
 
-ss -H -lunp 'sport = :443' | grep -q . && die "udp/443 became occupied"
+ss -H -lunp 'sport = :443' | grep . >/dev/null && die "udp/443 became occupied"
 assert_protected_units_active
 FIREWALL_ROUTE_HASH_AFTER="$(snapshot_firewall_routes)"
 [ "$FIREWALL_ROUTE_HASH_AFTER" = "$FIREWALL_ROUTE_HASH_BEFORE" ] || die "firewall or route state changed"

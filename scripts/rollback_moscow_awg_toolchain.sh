@@ -19,11 +19,11 @@ require_cmd() {
 }
 
 host_has_expected_ipv4() {
-  ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | grep -Fxq "$EXPECTED_HOST_IPV4"
+  ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | grep -Fx "$EXPECTED_HOST_IPV4" >/dev/null
 }
 
 package_installed() {
-  dpkg-query -W -f='${Status}\n' "$1" 2>/dev/null | grep -qx 'install ok installed'
+  dpkg-query -W -f='${Status}\n' "$1" 2>/dev/null | grep -x 'install ok installed' >/dev/null
 }
 
 snapshot_firewall_routes() {
@@ -62,18 +62,18 @@ host_has_expected_ipv4 || die "host identity mismatch; expected IPv4 $EXPECTED_H
 [ -f "$SOURCE_FILE" ] || die "managed APT source is absent"
 [ -f "$KEYRING" ] || die "managed keyring is absent"
 
-grep -qx 'owner=vps-tier' "$STATE_FILE" || die "state ownership mismatch"
+grep -x 'owner=vps-tier' "$STATE_FILE" >/dev/null || die "state ownership mismatch"
 BACKUP_SET="$(awk -F= '$1=="backup_set" {print substr($0,index($0,"=")+1)}' "$STATE_FILE" | tail -n 1)"
 [ -n "$BACKUP_SET" ] || die "backup set missing from state"
 
-ip -o link show | grep -Eiq '(^|: )[[:alnum:]_.-]*(awg|amnezia)' && \
+ip -o link show | grep -Ei '(^|: )[[:alnum:]_.-]*(awg|amnezia)' >/dev/null && \
   die "AWG interface exists; remove client-ingress configuration before toolchain rollback"
 
 assert_protected_units_active
 FIREWALL_ROUTE_HASH_BEFORE="$(snapshot_firewall_routes)"
 
 modprobe -r amneziawg >/dev/null 2>&1 || true
-lsmod | grep -q '^amneziawg ' && die "amneziawg module is still loaded"
+lsmod | grep '^amneziawg ' >/dev/null && die "amneziawg module is still loaded"
 
 if [ -s "$NEW_PACKAGES_FILE" ]; then
   xargs -r apt-get purge -y -- < "$NEW_PACKAGES_FILE"
