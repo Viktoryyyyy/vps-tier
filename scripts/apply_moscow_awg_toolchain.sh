@@ -97,7 +97,7 @@ rollback_on_error() {
 
 [ "${EUID:-$(id -u)}" -eq 0 ] || die "run as root"
 
-for cmd in git ip awk grep cut curl gpg apt-get apt-cache dpkg-query dkms dpkg-deb sha256sum sort comm cmp mktemp install systemctl modprobe modinfo lsmod ss ufw sysctl; do
+for cmd in git ip awk grep cut curl gpg apt-get apt-cache dpkg-query sha256sum sort comm mktemp install systemctl modprobe modinfo lsmod ss ufw sysctl xargs; do
   require_cmd "$cmd"
 done
 
@@ -105,7 +105,7 @@ repo_root="$(git -c safe.directory="$PWD" rev-parse --show-toplevel 2>/dev/null)
 [ "$repo_root" = "$PWD" ] || die "run from repository root: $repo_root"
 [ "$(git branch --show-current)" = "main" ] || die "run from main branch"
 [ -z "$(git status --porcelain)" ] || die "working tree must be clean"
-[ -x "$PROBE_SCRIPT" ] || die "missing executable probe: $PROBE_SCRIPT"
+[ -f "$PROBE_SCRIPT" ] || die "missing probe: $PROBE_SCRIPT"
 host_has_expected_ipv4 || die "host identity mismatch; expected IPv4 $EXPECTED_HOST_IPV4"
 
 . /etc/os-release
@@ -188,6 +188,7 @@ AMNEZIAWG_DKMS_CANDIDATE="$(apt-cache policy amneziawg-dkms | awk '/^[[:space:]]
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --no-upgrade \
   dkms amneziawg amneziawg-dkms
 
+command -v dkms >/dev/null 2>&1 || die "dkms command missing after install"
 command -v awg >/dev/null 2>&1 || die "awg command missing after install"
 command -v awg-quick >/dev/null 2>&1 || die "awg-quick command missing after install"
 modinfo amneziawg >/dev/null 2>&1 || die "amneziawg module metadata missing"
