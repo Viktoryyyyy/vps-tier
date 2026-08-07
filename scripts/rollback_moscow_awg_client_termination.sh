@@ -49,6 +49,7 @@ rm -rf "$material_dir"
 
 ip link show "$IFACE" >/dev/null 2>&1 && fail "AWG interface still present"
 systemctl is-active --quiet "$UNIT" && fail "AWG unit still active"
+systemctl is-enabled --quiet "$UNIT" && fail "AWG unit still enabled"
 ufw_has_marker && fail "owned UFW rule still present"
 [ ! -e "$TARGET_CONF" ] || fail "AWG config still present"
 [ ! -e "$material_dir" ] || fail "AWG material still present"
