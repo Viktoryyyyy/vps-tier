@@ -98,12 +98,15 @@ IPv6 forwarding remains disabled. Current loose reverse-path filtering (`rp_filt
 
 A managed policy-barrier systemd unit installs the source rule and terminal `prohibit default` independently of the backbone interface.
 
-The AWG client unit gains a systemd dependency requiring both:
+The AWG client unit uses the following startup relationship:
 
-- active UFW startup handling;
-- successful policy-barrier installation.
+- `Requires=ufw.service`, so loss of the required firewall service remains a strong dependency;
+- `Wants=vps-tier-moscow-client-policy.service` plus `After=` ordering;
+- `ExecStartPre` verifies that the policy-barrier service is active before AWG may start.
 
-Therefore the client termination must not become available at boot before the fail-closed policy barrier is present. If the backbone comes up later, its `PostUp` adds only the usable table-1071 route. If the backbone is absent, the policy rule terminates at `prohibit default` rather than falling through to Moscow `eth0`.
+This prevents the client termination from becoming available at boot before the fail-closed policy barrier is present, while avoiding a shutdown dependency that would tear down the accepted Stage-5 AWG interface when Stage 6 intentionally stops its policy unit during rollback.
+
+If the backbone comes up later, its `PostUp` adds only the usable table-1071 route. If the backbone is absent, the policy rule terminates at `prohibit default` rather than falling through to Moscow `eth0`.
 
 ## NAT Boundary
 
@@ -147,6 +150,8 @@ Fail-closed ordering is mandatory:
 ## Rollback Order
 
 Rollback closes IPv4 forwarding first. Only then may it remove UFW/policy barriers, restore the Stage-5 WireGuard AllowedIPs/configuration and remove Stage-6 persistence artifacts.
+
+The AWG startup-gate drop-in must not create a stop-propagation dependency from the policy unit to the Stage-5 AWG service. Controlled rollback stops the policy unit only after forwarding has already been closed and must preserve the active Stage-5 AWG termination.
 
 Rollback must preserve the Stage-5 AWG termination and the standard WireGuard backbone.
 
