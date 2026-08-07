@@ -20,6 +20,7 @@ UFW_COMMENT="vps-tier-kz-client-egress-forward"
 NAT_COMMENT="vps-tier-kz-client-egress"
 BASE_ALLOWED="10.70.0.1/32"
 APPLIED_ALLOWED="10.70.0.1/32, 10.71.0.0/24"
+APPLIED_ALLOWED_RUNTIME="10.70.0.1/32,10.71.0.0/24"
 TMP_DIR=""
 BACKUP_DIR=""
 CONFIG_CHANGED=0
@@ -45,6 +46,32 @@ assert_required_units() {
 }
 nat_rule_exists() {
   iptables -t nat -C POSTROUTING -s "$CLIENT_SUBNET" -o "$WAN_IF" -m comment --comment "$NAT_COMMENT" -j SNAT --to-source "$EXPECTED_IPV4" 2>/dev/null
+}
+runtime_allowed_ips() {
+  wg show "$WG_IF" dump | awk -F '\t' -v key="$PEER_PUBLIC_KEY" '$1==key {print $4}'
+}
+assert_no_client_subnet_overlap() {
+  python3 -c '
+import ipaddress, sys
+target = ipaddress.ip_network(sys.argv[1], strict=False)
+for raw in sys.stdin:
+    value = raw.strip()
+    if not value:
+        continue
+    try:
+        network = ipaddress.ip_network(value, strict=False)
+    except ValueError:
+        continue
+    if target.overlaps(network):
+        print(f"ERROR: client subnet overlaps existing prefix {network}", file=sys.stderr)
+        sys.exit(1)
+' "$CLIENT_SUBNET" < <(
+    ip -4 -o addr show | awk '{print $4}'
+    ip -4 route show table all | awk '$1 ~ /^[0-9]+\./ {print $1}'
+    for id in $(docker network ls -q); do
+      docker network inspect -f '{{range .IPAM.Config}}{{.Subnet}}{{println}}{{end}}' "$id"
+    done
+  )
 }
 cleanup() { [ -z "$TMP_DIR" ] || rm -rf "$TMP_DIR"; rm -f "$TARGET_TMP"; }
 rollback_on_error() {
@@ -74,7 +101,7 @@ trap cleanup EXIT
 
 [ "${EUID:-$(id -u)}" -eq 0 ] || fail "run as root"
 [[ "$SOURCE_HEAD" =~ ^[0-9a-f]{40}$ ]] || fail "VPS_TIER_SOURCE_HEAD must be a full lowercase commit SHA"
-for cmd in awk cmp cut date dpkg grep install ip iptables iptables-save mktemp mv ping sed sha256sum sysctl systemctl ufw wg wg-quick; do require_cmd "$cmd"; done
+for cmd in awk cmp cut date docker dpkg grep install ip iptables iptables-save mktemp mv ping python3 sed sha256sum sysctl systemctl ufw wg wg-quick; do require_cmd "$cmd"; done
 host_ok || fail "host identity mismatch"
 . /etc/os-release
 [ "${ID:-}" = ubuntu ] && [ "${VERSION_CODENAME:-}" = "$EXPECTED_CODENAME" ] || fail "OS/suite mismatch"
@@ -93,11 +120,11 @@ ufw status | grep -x 'Status: active' >/dev/null || fail "UFW inactive"
 iptables-save -t filter | grep -F 'ufw-before-forward' | grep -F 'RELATED,ESTABLISHED' >/dev/null || fail "UFW established-forward rule absent"
 assert_required_units
 
-wg show "$WG_IF" allowed-ips | grep -F "$PEER_PUBLIC_KEY" | grep -F "$BASE_ALLOWED" >/dev/null || fail "baseline peer AllowedIPs missing"
-wg show "$WG_IF" allowed-ips | grep -F "$CLIENT_SUBNET" >/dev/null && fail "client subnet already in runtime AllowedIPs"
+RUNTIME_ALLOWED_BEFORE="$(runtime_allowed_ips)"
+[ "$RUNTIME_ALLOWED_BEFORE" = "$BASE_ALLOWED" ] || fail "runtime peer AllowedIPs are not at the exact approved baseline"
 grep -Fx "AllowedIPs = $BASE_ALLOWED" "$TARGET_CONF" >/dev/null || fail "persistent baseline AllowedIPs mismatch"
 grep -F "$CLIENT_SUBNET" "$TARGET_CONF" >/dev/null && fail "client subnet already in backbone config"
-ip -4 route show table all | grep -F "$CLIENT_SUBNET" >/dev/null && fail "client subnet route already exists"
+assert_no_client_subnet_overlap || fail "client subnet overlaps current host/route/Docker state"
 ufw_has_marker && fail "managed UFW forward rule already exists"
 ufw status numbered | grep -F "$CLIENT_SUBNET" >/dev/null && fail "unmanaged UFW client-subnet rule exists"
 snapshot_nat | grep -F "$NAT_COMMENT" >/dev/null && fail "managed NAT rule already exists"
@@ -141,7 +168,7 @@ ip route add "$CLIENT_SUBNET" dev "$WG_IF"; ROUTE_ADDED=1
 ufw route allow in on "$WG_IF" out on "$WAN_IF" from "$CLIENT_SUBNET" comment "$UFW_COMMENT" >/dev/null; UFW_ADDED=1
 iptables -t nat -A POSTROUTING -s "$CLIENT_SUBNET" -o "$WAN_IF" -m comment --comment "$NAT_COMMENT" -j SNAT --to-source "$EXPECTED_IPV4"; NAT_ADDED=1
 
-wg show "$WG_IF" allowed-ips | grep -F "$PEER_PUBLIC_KEY" | grep -F "$BASE_ALLOWED" | grep -F "$CLIENT_SUBNET" >/dev/null || fail "runtime AllowedIPs validation failed"
+[ "$(runtime_allowed_ips)" = "$APPLIED_ALLOWED_RUNTIME" ] || fail "runtime AllowedIPs validation failed"
 ip -4 route show "$CLIENT_SUBNET" | grep -F "dev $WG_IF" >/dev/null || fail "client return route missing"
 ufw_has_marker || fail "UFW routed allow validation failed"
 nat_rule_exists || fail "SNAT validation failed"
