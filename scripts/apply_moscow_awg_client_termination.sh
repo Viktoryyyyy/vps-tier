@@ -123,7 +123,8 @@ systemctl cat awg-quick@.service >/dev/null 2>&1 || fail "awg-quick systemd temp
 ss -H -lun "sport = :$PORT" | grep . >/dev/null && fail "udp/$PORT is occupied"
 ufw_active || fail "UFW must be active"
 ufw_has_marker && fail "managed AWG ingress UFW rule already exists"
-ufw status numbered | grep -E '443/udp|10\.71\.|awg-client' >/dev/null && fail "unmanaged AWG/client-related UFW rule exists"
+ufw status numbered | grep -E '(^|[^0-9])443/udp([[:space:]]|$)|10\.71\.|awg-client' >/dev/null && fail "unmanaged AWG/client-related UFW rule exists"
+ufw --dry-run allow from any to "$EXPECTED_IPV4" port "$PORT" proto udp comment "$UFW_COMMENT" >/dev/null
 [ "$(sysctl -n net.ipv4.ip_forward)" = 0 ] || fail "Moscow IPv4 forwarding must remain 0 for Stage 5"
 [ "$(sysctl -n net.ipv6.conf.all.forwarding)" = 0 ] || fail "Moscow IPv6 forwarding must remain 0"
 assert_no_client_subnet_overlap || fail "client subnet overlaps current Moscow state"
