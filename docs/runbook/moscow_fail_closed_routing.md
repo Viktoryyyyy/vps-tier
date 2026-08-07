@@ -28,14 +28,16 @@ The usable policy-table default follows the backbone lifecycle. The policy rule 
 
 ## Boot Ordering
 
-The managed AWG systemd drop-in requires:
+The managed AWG systemd drop-in uses:
 
 ```text
-ufw.service
-vps-tier-moscow-client-policy.service
+Requires=ufw.service
+Wants=vps-tier-moscow-client-policy.service
+After=ufw.service vps-tier-moscow-client-policy.service
+ExecStartPre=systemctl is-active --quiet vps-tier-moscow-client-policy.service
 ```
 
-This prevents the client termination from starting at boot before UFW startup and the source-policy fail-closed barrier.
+This keeps UFW as a strong service dependency and prevents AWG startup unless the fail-closed policy barrier is active. The policy service is intentionally a startup gate rather than a stop-propagating `Requires=` dependency, so controlled Stage-6 rollback does not tear down the accepted Stage-5 AWG interface when the policy unit is stopped.
 
 ## Firewall
 
@@ -123,6 +125,8 @@ scripts/rollback_moscow_fail_closed_routing.sh
 ```
 
 Rollback first sets Moscow IPv4 forwarding back to `0`. It then removes Stage-6 routed UFW rules, policy routes/rule and persistence files, restores the Stage-5 WireGuard configuration and `10.70.0.2/32` peer AllowedIPs, and preserves both the AWG termination and backbone.
+
+The AWG policy relationship is startup-gated rather than stop-propagating, so stopping the Stage-6 policy unit during rollback must not stop `awg-quick@awg-client.service`.
 
 Rollback refuses to overwrite a WireGuard configuration that has diverged from both the recorded Stage-5 baseline and Stage-6 applied hash.
 
