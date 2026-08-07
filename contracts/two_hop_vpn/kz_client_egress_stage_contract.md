@@ -20,10 +20,27 @@ Kazakhstan must:
 - allow forwarding only from that client subnet entering `wg-backbone` and leaving `enp3s0`;
 - preserve established/related return traffic handling;
 - apply explicit SNAT to `194.32.142.88` for that client subnet only;
-- keep `net.ipv4.ip_forward=1` unchanged;
-- keep IPv6 forwarding disabled;
+- keep runtime `net.ipv4.ip_forward=1` unchanged and make that value explicitly persistent;
+- keep runtime IPv6 forwarding disabled and make that fail-closed value explicitly persistent;
 - keep the Kazakhstan default route unchanged;
 - preserve the existing backbone and protected application services.
+
+## Forwarding Persistence Boundary
+
+Stage 4 may create only this managed sysctl file for forwarding persistence:
+
+```text
+/etc/sysctl.d/99-vps-tier-kz-client-egress.conf
+```
+
+Its authorized settings are exactly:
+
+```text
+net.ipv4.ip_forward = 1
+net.ipv6.conf.all.forwarding = 0
+```
+
+Apply must stop before mutation if another persistent assignment for either key is present. The runtime values must already equal `1` and `0`; this stage must not transition forwarding state, only make the observed values reboot-persistent.
 
 ## WireGuard Boundary
 
@@ -83,9 +100,11 @@ KZ_PEER_ALLOWED_IPS=10.70.0.1/32+10.71.0.0/24
 KZ_CLIENT_RETURN_ROUTE=present
 KZ_UFW_CLIENT_FORWARD=present_managed
 KZ_CLIENT_SNAT=194.32.142.88_managed
+KZ_IPV4_FORWARD_RUNTIME=1_unchanged
+KZ_IPV4_FORWARD_PERSISTENCE=managed_1
+KZ_IPV6_FORWARD_RUNTIME=0_unchanged
+KZ_IPV6_FORWARD_PERSISTENCE=managed_0
 DEFAULT_ROUTE_CHANGE=none
-IPV4_FORWARD_CHANGE=none
-IPV6_FORWARD_CHANGE=none
 BACKBONE_HEALTH=preserved
 PROTECTED_SERVICES=unchanged
 END_TO_END_TEST=deferred
