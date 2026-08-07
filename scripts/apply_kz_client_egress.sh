@@ -10,6 +10,7 @@ CLIENT_SUBNET="10.71.0.0/24"
 PEER_BACKBONE_IP="10.70.0.1"
 PEER_PUBLIC_KEY="tfSZHDDhIcgim4s6fujmel13vSvThM1Q5EAq/lK8kDQ="
 TARGET_CONF="/etc/wireguard/wg-backbone.conf"
+TARGET_TMP="${TARGET_CONF}.vps-tier.tmp"
 WG_UNIT="wg-quick@wg-backbone.service"
 STATE_DIR="/var/lib/vps-tier/kz-client-egress"
 STATE_FILE="$STATE_DIR/state.env"
@@ -45,7 +46,7 @@ assert_required_units() {
 nat_rule_exists() {
   iptables -t nat -C POSTROUTING -s "$CLIENT_SUBNET" -o "$WAN_IF" -m comment --comment "$NAT_COMMENT" -j SNAT --to-source "$EXPECTED_IPV4" 2>/dev/null
 }
-cleanup() { [ -z "$TMP_DIR" ] || rm -rf "$TMP_DIR"; }
+cleanup() { [ -z "$TMP_DIR" ] || rm -rf "$TMP_DIR"; rm -f "$TARGET_TMP"; }
 rollback_on_error() {
   rc=$?; trap - ERR; set +e
   echo "ERROR: KZ client egress apply failed; reverting task-owned changes" >&2
@@ -53,15 +54,27 @@ rollback_on_error() {
   if [ "$UFW_ADDED" -eq 1 ]; then ufw --force delete route allow in on "$WG_IF" out on "$WAN_IF" from "$CLIENT_SUBNET" >/dev/null 2>&1; fi
   if [ "$ROUTE_ADDED" -eq 1 ]; then ip route del "$CLIENT_SUBNET" dev "$WG_IF" 2>/dev/null; fi
   if [ "$WG_CHANGED" -eq 1 ]; then wg set "$WG_IF" peer "$PEER_PUBLIC_KEY" allowed-ips "$BASE_ALLOWED"; fi
-  if [ "$CONFIG_CHANGED" -eq 1 ] && [ -r "$BACKUP_DIR/wg-backbone.conf.before" ]; then install -o root -g root -m 0600 "$BACKUP_DIR/wg-backbone.conf.before" "$TARGET_CONF"; fi
-  rm -rf "$STATE_DIR"
+  if [ "$CONFIG_CHANGED" -eq 1 ] && [ -r "$BACKUP_DIR/wg-backbone.conf.before" ]; then
+    install -o root -g root -m 0600 "$BACKUP_DIR/wg-backbone.conf.before" "$TARGET_TMP"
+    mv -f "$TARGET_TMP" "$TARGET_CONF"
+  fi
+  rollback_ok=1
+  nat_rule_exists && rollback_ok=0
+  ufw_has_marker && rollback_ok=0
+  ip -4 route show table all | grep -F "$CLIENT_SUBNET" >/dev/null && rollback_ok=0
+  wg show "$WG_IF" allowed-ips | grep -F "$CLIENT_SUBNET" >/dev/null && rollback_ok=0
+  if [ "$rollback_ok" -eq 1 ]; then
+    rm -rf "$STATE_DIR"
+  else
+    echo "ERROR: automatic rollback incomplete; managed state retained" >&2
+  fi
   exit "$rc"
 }
 trap cleanup EXIT
 
 [ "${EUID:-$(id -u)}" -eq 0 ] || fail "run as root"
 [[ "$SOURCE_HEAD" =~ ^[0-9a-f]{40}$ ]] || fail "VPS_TIER_SOURCE_HEAD must be a full lowercase commit SHA"
-for cmd in awk cmp cut date dpkg grep install ip iptables iptables-save mktemp ping sed sha256sum sysctl systemctl ufw wg wg-quick; do require_cmd "$cmd"; done
+for cmd in awk cmp cut date dpkg grep install ip iptables iptables-save mktemp mv ping sed sha256sum sysctl systemctl ufw wg wg-quick; do require_cmd "$cmd"; done
 host_ok || fail "host identity mismatch"
 . /etc/os-release
 [ "${ID:-}" = ubuntu ] && [ "${VERSION_CODENAME:-}" = "$EXPECTED_CODENAME" ] || fail "OS/suite mismatch"
@@ -121,7 +134,8 @@ grep -Fx "$PRE_DOWN" "$TMP_CONF" >/dev/null
 
 mkdir -p "$STATE_DIR"; chmod 0700 "$STATE_DIR"
 trap rollback_on_error ERR
-install -o root -g root -m 0600 "$TMP_CONF" "$TARGET_CONF"; CONFIG_CHANGED=1
+install -o root -g root -m 0600 "$TMP_CONF" "$TARGET_TMP"
+mv -f "$TARGET_TMP" "$TARGET_CONF"; CONFIG_CHANGED=1
 wg set "$WG_IF" peer "$PEER_PUBLIC_KEY" allowed-ips "$BASE_ALLOWED","$CLIENT_SUBNET"; WG_CHANGED=1
 ip route add "$CLIENT_SUBNET" dev "$WG_IF"; ROUTE_ADDED=1
 ufw route allow in on "$WG_IF" out on "$WAN_IF" from "$CLIENT_SUBNET" comment "$UFW_COMMENT" >/dev/null; UFW_ADDED=1
