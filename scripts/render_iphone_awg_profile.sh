@@ -14,18 +14,21 @@ SERVER_PUB="$MATERIAL_DIR/server.pub"
 PARAMS_FILE="$MATERIAL_DIR/params.env"
 STAGE5_STATE="/var/lib/vps-tier/moscow-awg-client-termination/state.env"
 STAGE6_STATE="/var/lib/vps-tier/moscow-fail-closed-routing/state.env"
-OUTPUT_DIR="/var/lib/vps-tier/iphone-awg-profile"
+OUTPUT_PARENT="/var/lib/vps-tier"
+OUTPUT_DIR="$OUTPUT_PARENT/iphone-awg-profile"
 PROFILE_FILE="$OUTPUT_DIR/iphone-awg.conf"
 STATE_FILE="$OUTPUT_DIR/state.env"
 EVIDENCE_FILE="$OUTPUT_DIR/evidence.md"
 TMP_DIR=""
-OUTPUT_CREATED=0
+PUBLISH_DIR=""
+OUTPUT_OWNED=0
 RENDER_SUCCESS=0
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 cleanup() {
   [ -z "$TMP_DIR" ] || rm -rf "$TMP_DIR"
-  if [ "$RENDER_SUCCESS" -eq 0 ] && [ "$OUTPUT_CREATED" -eq 1 ]; then rm -rf "$OUTPUT_DIR"; fi
+  [ -z "$PUBLISH_DIR" ] || rm -rf "$PUBLISH_DIR"
+  if [ "$RENDER_SUCCESS" -eq 0 ] && [ "$OUTPUT_OWNED" -eq 1 ]; then rm -rf "$OUTPUT_DIR"; fi
 }
 trap cleanup EXIT
 
@@ -33,10 +36,11 @@ trap cleanup EXIT
 [[ "$SOURCE_HEAD" =~ ^[0-9a-f]{40}$ ]] || fail "VPS_TIER_SOURCE_HEAD must be a full lowercase commit SHA"
 ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | grep -Fx "$EXPECTED_IPV4" >/dev/null || fail "host identity mismatch"
 
-for cmd in awk awg awg-quick cut grep install ip mktemp sha256sum stat sysctl systemctl tr; do command -v "$cmd" >/dev/null 2>&1 || fail "missing command: $cmd"; done
+for cmd in awk awg awg-quick cut grep install ip mktemp mv sha256sum stat sysctl systemctl tr; do command -v "$cmd" >/dev/null 2>&1 || fail "missing command: $cmd"; done
 [ -r "$STAGE5_STATE" ] || fail "Stage-5 managed state missing"
 [ -r "$STAGE6_STATE" ] || fail "Stage-6 managed state missing"
 grep -Fx 'status=applied' "$STAGE6_STATE" >/dev/null || fail "Stage-6 managed state is not applied"
+[ -d "$OUTPUT_PARENT" ] || fail "managed runtime parent missing"
 [ ! -e "$OUTPUT_DIR" ] || fail "profile output already exists"
 systemctl is-active --quiet awg-quick@awg-client.service || fail "AWG client service inactive"
 systemctl is-active --quiet wg-quick@wg-backbone.service || fail "backbone service inactive"
@@ -100,13 +104,16 @@ unset CLIENT_PRIVATE CLIENT_PUBLIC SERVER_PUBLIC Jc Jmin Jmax S1 S2 H1 H2 H3 H4
 chmod 0600 "$TMP_PROFILE"
 awg-quick strip "$TMP_PROFILE" >/dev/null
 
-install -d -o root -g root -m 0700 "$OUTPUT_DIR"
-OUTPUT_CREATED=1
-install -o root -g root -m 0600 "$TMP_PROFILE" "$PROFILE_FILE"
-[ "$(stat -c '%U:%G %a' "$OUTPUT_DIR")" = "root:root 700" ] || fail "output directory permissions invalid"
-[ "$(stat -c '%U:%G %a' "$PROFILE_FILE")" = "root:root 600" ] || fail "profile permissions invalid"
-PROFILE_SHA="$(sha256sum "$PROFILE_FILE" | awk '{print $1}')"
-cat > "$STATE_FILE" <<STATE
+PUBLISH_DIR="$(mktemp -d "$OUTPUT_PARENT/.iphone-awg-profile.XXXXXX")"
+chmod 0700 "$PUBLISH_DIR"
+PUBLISH_PROFILE="$PUBLISH_DIR/iphone-awg.conf"
+PUBLISH_STATE="$PUBLISH_DIR/state.env"
+PUBLISH_EVIDENCE="$PUBLISH_DIR/evidence.md"
+install -o root -g root -m 0600 "$TMP_PROFILE" "$PUBLISH_PROFILE"
+[ "$(stat -c '%U:%G %a' "$PUBLISH_DIR")" = "root:root 700" ] || fail "staging directory permissions invalid"
+[ "$(stat -c '%U:%G %a' "$PUBLISH_PROFILE")" = "root:root 600" ] || fail "staged profile permissions invalid"
+PROFILE_SHA="$(sha256sum "$PUBLISH_PROFILE" | awk '{print $1}')"
+cat > "$PUBLISH_STATE" <<STATE
 owner=vps-tier
 source_head=$SOURCE_HEAD
 profile_path=$PROFILE_FILE
@@ -117,8 +124,8 @@ dns=$DNS_SERVER
 ipv4_full_tunnel=yes
 ipv6_fail_closed_capture=yes
 STATE
-chmod 0600 "$STATE_FILE"
-cat > "$EVIDENCE_FILE" <<EVIDENCE
+chmod 0600 "$PUBLISH_STATE"
+cat > "$PUBLISH_EVIDENCE" <<EVIDENCE
 # iPhone AmneziaWG Profile — Render Evidence
 
 - Source Git HEAD: $SOURCE_HEAD
@@ -136,7 +143,18 @@ cat > "$EVIDENCE_FILE" <<EVIDENCE
 - Complete profile or private material printed: no
 - Profile SHA-256: $PROFILE_SHA
 EVIDENCE
-chmod 0600 "$EVIDENCE_FILE"
+chmod 0600 "$PUBLISH_EVIDENCE"
+[ "$(stat -c '%U:%G %a' "$PUBLISH_STATE")" = "root:root 600" ] || fail "staged state permissions invalid"
+[ "$(stat -c '%U:%G %a' "$PUBLISH_EVIDENCE")" = "root:root 600" ] || fail "staged evidence permissions invalid"
+[ "$(sha256sum "$PUBLISH_PROFILE" | awk '{print $1}')" = "$PROFILE_SHA" ] || fail "staged profile hash changed"
+
+mv "$PUBLISH_DIR" "$OUTPUT_DIR"
+PUBLISH_DIR=""
+OUTPUT_OWNED=1
+[ "$(stat -c '%U:%G %a' "$OUTPUT_DIR")" = "root:root 700" ] || fail "output directory permissions invalid"
+[ "$(stat -c '%U:%G %a' "$PROFILE_FILE")" = "root:root 600" ] || fail "profile permissions invalid"
+[ -r "$STATE_FILE" ] && [ -r "$EVIDENCE_FILE" ] || fail "published state/evidence missing"
+[ "$(sha256sum "$PROFILE_FILE" | awk '{print $1}')" = "$PROFILE_SHA" ] || fail "published profile hash changed"
 RENDER_SUCCESS=1
 
 echo "DONE: iPhone AmneziaWG profile rendered"
