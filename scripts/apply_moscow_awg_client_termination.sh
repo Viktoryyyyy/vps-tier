@@ -90,6 +90,7 @@ rollback_on_error() {
   if [ "$MATERIAL_CREATED" -eq 1 ]; then rm -rf "$MATERIAL_DIR"; fi
   rollback_ok=1
   ip link show "$IFACE" >/dev/null 2>&1 && rollback_ok=0
+  systemctl is-enabled --quiet "$UNIT" && rollback_ok=0
   ufw_has_marker && rollback_ok=0
   [ -e "$TARGET_CONF" ] && rollback_ok=0
   [ -e "$MATERIAL_DIR" ] && rollback_ok=0
@@ -132,8 +133,8 @@ assert_required_units
 
 BACKUP_ID="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_DIR="$BACKUP_ROOT/$BACKUP_ID"
-mkdir -p "$BACKUP_DIR" "$STATE_DIR"
-chmod 0700 "$BACKUP_DIR" "$STATE_DIR"
+mkdir -p "$BACKUP_DIR"
+chmod 0700 "$BACKUP_DIR"
 DEFAULT_ROUTE_BEFORE="$(ip -4 route show default)"
 BACKBONE_ROUTE_BEFORE="$(ip -4 route show 10.70.0.0/30)"
 IPV4_FORWARD_BEFORE="$(sysctl -n net.ipv4.ip_forward)"
@@ -143,6 +144,8 @@ snapshot_units "$BACKUP_DIR/units.before"
 ufw status numbered > "$BACKUP_DIR/ufw.before"
 
 trap rollback_on_error ERR
+mkdir -p "$STATE_DIR"
+chmod 0700 "$STATE_DIR"
 mkdir -p "$MATERIAL_DIR"
 chmod 0700 "$CONFIG_DIR/vps-tier" "$MATERIAL_DIR"
 MATERIAL_CREATED=1
