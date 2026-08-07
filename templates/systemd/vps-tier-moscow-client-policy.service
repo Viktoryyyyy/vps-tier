@@ -1,0 +1,11 @@
+[Unit]
+Description=VPS Tier Moscow client fail-closed policy barrier
+Before=awg-quick@awg-client.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/vps-tier/moscow-client-policy-runtime up
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
