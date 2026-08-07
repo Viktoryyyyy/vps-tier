@@ -8,6 +8,7 @@ CLIENT_SUBNET="10.71.0.0/24"
 PEER_PUBLIC_KEY="tfSZHDDhIcgim4s6fujmel13vSvThM1Q5EAq/lK8kDQ="
 BASE_ALLOWED="10.70.0.1/32"
 TARGET_CONF="/etc/wireguard/wg-backbone.conf"
+TARGET_TMP="${TARGET_CONF}.vps-tier.tmp"
 STATE_DIR="/var/lib/vps-tier/kz-client-egress"
 STATE_FILE="$STATE_DIR/state.env"
 UFW_COMMENT="vps-tier-kz-client-egress-forward"
@@ -15,13 +16,18 @@ NAT_COMMENT="vps-tier-kz-client-egress"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 [ "${EUID:-$(id -u)}" -eq 0 ] || fail "run as root"
+for cmd in awk cut grep install ip iptables iptables-save mv ping sha256sum systemctl ufw wg wg-quick; do command -v "$cmd" >/dev/null 2>&1 || fail "missing command: $cmd"; done
 [ -r "$STATE_FILE" ] || fail "managed client-egress state missing"
 # shellcheck disable=SC1090
 . "$STATE_FILE"
 [ "$owner" = vps-tier ] || fail "state ownership mismatch"
 [ "$client_subnet" = "$CLIENT_SUBNET" ] || fail "state subnet mismatch"
 [ -r "$backup_set/wg-backbone.conf.before" ] || fail "backup config missing"
-[ "$(sha256sum "$TARGET_CONF" | awk '{print $1}')" = "$applied_config_sha256" ] || fail "current backbone config diverged; rollback blocked"
+CURRENT_CONFIG_SHA="$(sha256sum "$TARGET_CONF" | awk '{print $1}')"
+case "$CURRENT_CONFIG_SHA" in
+  "$applied_config_sha256"|"$before_config_sha256") ;;
+  *) fail "current backbone config diverged; rollback blocked" ;;
+esac
 ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | grep -Fx "$EXPECTED_IPV4" >/dev/null || fail "host identity mismatch"
 systemctl is-active --quiet wg-quick@wg-backbone.service || fail "backbone unit inactive"
 
@@ -33,8 +39,10 @@ if ufw status numbered | grep -F "$UFW_COMMENT" >/dev/null; then
 fi
 ip route del "$CLIENT_SUBNET" dev "$WG_IF" 2>/dev/null || true
 wg set "$WG_IF" peer "$PEER_PUBLIC_KEY" allowed-ips "$BASE_ALLOWED"
-install -o root -g root -m 0600 "$backup_set/wg-backbone.conf.before" "$TARGET_CONF"
+install -o root -g root -m 0600 "$backup_set/wg-backbone.conf.before" "$TARGET_TMP"
+mv -f "$TARGET_TMP" "$TARGET_CONF"
 wg-quick strip "$TARGET_CONF" >/dev/null
+[ "$(sha256sum "$TARGET_CONF" | awk '{print $1}')" = "$before_config_sha256" ] || fail "baseline config hash not restored"
 
 wg show "$WG_IF" allowed-ips | grep -F "$PEER_PUBLIC_KEY" | grep -F "$BASE_ALLOWED" >/dev/null || fail "baseline AllowedIPs not restored"
 wg show "$WG_IF" allowed-ips | grep -F "$CLIENT_SUBNET" >/dev/null && fail "client subnet still in runtime AllowedIPs"
