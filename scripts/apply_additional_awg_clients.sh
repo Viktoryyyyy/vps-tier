@@ -19,6 +19,8 @@ DNS="1.1.1.1"
 MTU="1280"
 TMP_DIR=""
 BACKUP_DIR=""
+WIN_PUBLIC=""
+TV_PUBLIC=""
 CONFIG_REPLACED=0
 WIN_RUNTIME=0
 TV_RUNTIME=0
@@ -29,8 +31,8 @@ rollback_on_error() {
   rc=$?
   trap - ERR
   set +e
-  [ "$TV_RUNTIME" -eq 0 ] || awg set "$IFACE" peer "$TV_PUBLIC" remove >/dev/null 2>&1
-  [ "$WIN_RUNTIME" -eq 0 ] || awg set "$IFACE" peer "$WIN_PUBLIC" remove >/dev/null 2>&1
+  if [ "$TV_RUNTIME" -eq 1 ] && [ -n "$TV_PUBLIC" ]; then awg set "$IFACE" peer "$TV_PUBLIC" remove >/dev/null 2>&1; fi
+  if [ "$WIN_RUNTIME" -eq 1 ] && [ -n "$WIN_PUBLIC" ]; then awg set "$IFACE" peer "$WIN_PUBLIC" remove >/dev/null 2>&1; fi
   if [ "$CONFIG_REPLACED" -eq 1 ] && [ -r "$BACKUP_DIR/awg-client.conf.before" ]; then
     install -o root -g root -m 0600 "$BACKUP_DIR/awg-client.conf.before" "$CONFIG"
   fi
@@ -102,6 +104,9 @@ awg-quick strip "$NEW_CONFIG" >/dev/null
 for n in Jc Jmin Jmax S1 S2 H1 H2 H3 H4; do
   [[ "${!n:-}" =~ ^[0-9]+$ ]] || fail "invalid AWG parameter: $n"
 done
+(( Jc >= 4 && Jc <= 12 )) || fail "Jc out of Stage-5 range"
+(( Jmin == 8 && Jmax == 80 )) || fail "Jmin/Jmax differ from Stage-5 contract"
+(( S1 >= 15 && S1 <= 150 && S2 >= 15 && S2 <= 150 && S1 + 56 != S2 )) || fail "S1/S2 invalid"
 
 WIN_PRIVATE="$(tr -d '\r\n' < "$EXTRA_MATERIAL/windows.key")"
 TV_PRIVATE="$(tr -d '\r\n' < "$EXTRA_MATERIAL/sber-tv.key")"
