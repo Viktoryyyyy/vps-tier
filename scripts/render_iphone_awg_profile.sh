@@ -47,7 +47,7 @@ systemctl is-active --quiet wg-quick@wg-backbone.service || fail "backbone servi
 systemctl is-active --quiet vps-tier-moscow-client-policy.service || fail "Stage-6 policy service inactive"
 [ "$(sysctl -n net.ipv4.ip_forward)" = 1 ] || fail "Stage-6 IPv4 forwarding not active"
 [ "$(sysctl -n net.ipv6.conf.all.forwarding)" = 0 ] || fail "IPv6 forwarding must remain disabled"
-ip -4 rule show | grep -F '10710: from 10.71.0.0/24 lookup 1071' >/dev/null || fail "Stage-6 source policy rule missing"
+ip -4 rule show | awk '$1=="10710:" && $2=="from" && $3=="10.71.0.0/24" && $4=="lookup" && $5=="1071" {found=1} END{exit !found}' || fail "Stage-6 source policy rule missing"
 ip -4 route show table 1071 | grep -E '^default dev wg-backbone .*metric 10([[:space:]]|$)' >/dev/null || fail "Stage-6 usable policy route missing"
 ip -4 route show table 1071 | grep -E '^prohibit default metric 32760([[:space:]]|$)' >/dev/null || fail "Stage-6 prohibit fallback route missing"
 ip -4 route get 1.1.1.1 from 10.71.0.2 iif awg-client | grep -F 'dev wg-backbone table 1071' >/dev/null || fail "Stage-6 policy lookup does not use backbone"
