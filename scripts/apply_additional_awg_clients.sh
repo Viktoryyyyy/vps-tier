@@ -25,7 +25,7 @@ CONFIG_REPLACED=0
 WIN_RUNTIME=0
 TV_RUNTIME=0
 
-fail() { echo "ERROR: $*" >&2; exit 1; }
+fail() { echo "ERROR: $*" >&2; return 1; }
 cleanup() { [ -z "$TMP_DIR" ] || rm -rf "$TMP_DIR"; }
 rollback_on_error() {
   rc=$?
