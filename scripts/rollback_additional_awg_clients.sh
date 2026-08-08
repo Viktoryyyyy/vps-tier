@@ -21,9 +21,15 @@ ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | grep -Fx "$EX
 [ "$(sha256sum "$OUTPUT_DIR/windows.conf" | awk '{print $1}')" = "${windows_profile_sha256:-}" ] || fail "Windows profile diverged"
 [ "$(sha256sum "$OUTPUT_DIR/sber-tv.conf" | awk '{print $1}')" = "${tv_profile_sha256:-}" ] || fail "TV profile diverged"
 
-awg set "$IFACE" peer "$windows_public_key" remove
-awg set "$IFACE" peer "$tv_public_key" remove
 install -o root -g root -m 0600 "$backup_dir/awg-client.conf.before" "$CONFIG"
+
+if systemctl is-active --quiet awg-quick@awg-client.service; then
+  if ! awg syncconf "$IFACE" <(awg-quick strip "$CONFIG"); then
+    echo "ERROR: persistent config restored but runtime sync failed; managed state retained" >&2
+    exit 1
+  fi
+fi
+
 rm -rf "$EXTRA_MATERIAL" "$OUTPUT_DIR"
 
 echo "DONE: additional AmneziaWG clients removed"
