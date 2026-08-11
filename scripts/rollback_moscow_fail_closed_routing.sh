@@ -22,6 +22,11 @@ STATE_DIR="/var/lib/vps-tier/moscow-fail-closed-routing"
 STATE_FILE="$STATE_DIR/state.env"
 UFW_FORWARD_COMMENT="vps-tier-moscow-client-forward"
 UFW_DENY_COMMENT="vps-tier-moscow-client-no-fallback"
+WATCHDOG_STATE_DIR="/var/lib/vps-tier/moscow-client-policy-watchdog"
+WATCHDOG_RUNTIME="/usr/local/libexec/vps-tier/moscow-client-policy-watchdog"
+WATCHDOG_SERVICE_UNIT="/etc/systemd/system/vps-tier-moscow-client-policy-watchdog.service"
+WATCHDOG_TIMER_UNIT="/etc/systemd/system/vps-tier-moscow-client-policy-watchdog.timer"
+WATCHDOG_TIMER_NAME="vps-tier-moscow-client-policy-watchdog.timer"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 host_ok() { ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | grep -Fx "$EXPECTED_IPV4" >/dev/null; }
@@ -41,9 +46,20 @@ remove_policy_barrier() {
   while exact_policy_rule; do ip -4 rule del priority "$RULE_PRIORITY" from "$CLIENT_SUBNET" lookup "$TABLE_ID"; done
   ip -4 route del prohibit default table "$TABLE_ID" metric 32760 2>/dev/null || true
 }
+watchdog_present() {
+  [ -e "$WATCHDOG_STATE_DIR" ] ||
+    [ -e "$WATCHDOG_RUNTIME" ] ||
+    [ -e "$WATCHDOG_SERVICE_UNIT" ] ||
+    [ -e "$WATCHDOG_TIMER_UNIT" ] ||
+    systemctl is-enabled --quiet "$WATCHDOG_TIMER_NAME" 2>/dev/null ||
+    systemctl is-active --quiet "$WATCHDOG_TIMER_NAME" 2>/dev/null
+}
 
 [ "${EUID:-$(id -u)}" -eq 0 ] || fail "run as root"
 host_ok || fail "host identity mismatch"
+if watchdog_present; then
+  fail "Moscow policy watchdog is installed; run scripts/rollback_moscow_client_policy_watchdog.sh before Stage-6 rollback"
+fi
 [ -r "$STATE_FILE" ] || fail "managed Stage-6 state missing"
 # shellcheck disable=SC1090
 . "$STATE_FILE"
