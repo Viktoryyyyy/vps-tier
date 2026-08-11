@@ -1,6 +1,5 @@
 [Unit]
 Description=VPS Tier Moscow client policy watchdog
-Requires=vps-tier-moscow-client-policy.service
 After=vps-tier-moscow-client-policy.service
 ConditionPathExists=/var/lib/vps-tier/moscow-fail-closed-routing/state.env
 
