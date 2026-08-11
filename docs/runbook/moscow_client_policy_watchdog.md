@@ -80,11 +80,12 @@ Runtime targets on Moscow:
 
 ## Timer
 
+The timer is monotonic and runs while the host is up:
+
 ```text
 OnBootSec=30s
 OnUnitActiveSec=30s
 AccuracySec=5s
-Persistent=true
 ```
 
 The watchdog service is ordered after `vps-tier-moscow-client-policy.service`, but deliberately does not `Require=` it. The checker itself refuses repair when the Stage-6 policy service is inactive. This prevents the watchdog from re-starting the policy barrier during a controlled Stage-6 rollback.
