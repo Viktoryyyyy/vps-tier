@@ -13,9 +13,12 @@ STATE_FILE="$STATE_DIR/state.env"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 host_ok() { ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | grep -Fx "$EXPECTED_IPV4" >/dev/null; }
+priority_rules() { ip -4 rule show | awk -v p="${RULE_PRIORITY}:" '$1==p {$1=$1; print}'; }
 exact_rule() {
-  ip -4 rule show | awk -v p="${RULE_PRIORITY}:" '$1==p {print $1, $2, $3, $4, $5}' |
-    grep -Fx "${RULE_PRIORITY}: from ${CLIENT_SUBNET} lookup ${TABLE_ID}" >/dev/null
+  local rules count
+  rules="$(priority_rules)"
+  count="$(printf '%s\n' "$rules" | awk 'NF{n++} END{print n+0}')"
+  [ "$count" -eq 1 ] && [ "$rules" = "${RULE_PRIORITY}: from ${CLIENT_SUBNET} lookup ${TABLE_ID}" ]
 }
 prohibit_present() { ip -4 route show table "$TABLE_ID" | grep -E '^prohibit default.*metric 32760([[:space:]]|$)' >/dev/null; }
 
@@ -33,7 +36,7 @@ host_ok || fail "host identity mismatch"
 [ "$(sha256sum "$WATCHDOG_TARGET" | awk '{print $1}')" = "${watchdog_sha256:-}" ] || fail "watchdog runtime diverged; rollback blocked"
 [ "$(sha256sum "$SERVICE_TARGET" | awk '{print $1}')" = "${service_sha256:-}" ] || fail "watchdog service diverged; rollback blocked"
 [ "$(sha256sum "$TIMER_TARGET" | awk '{print $1}')" = "${timer_sha256:-}" ] || fail "watchdog timer diverged; rollback blocked"
-exact_rule || fail "Stage-6 policy rule unhealthy; repair Stage 6 before watchdog rollback"
+exact_rule || fail "Stage-6 exact single policy rule unhealthy; repair Stage 6 before watchdog rollback"
 prohibit_present || fail "Stage-6 prohibit default unhealthy; repair Stage 6 before watchdog rollback"
 
 systemctl disable --now vps-tier-moscow-client-policy-watchdog.timer >/dev/null 2>&1 || true
@@ -42,7 +45,7 @@ rm -f "$WATCHDOG_TARGET" "$SERVICE_TARGET" "$TIMER_TARGET"
 systemctl daemon-reload
 rm -rf "$STATE_DIR"
 
-exact_rule || fail "Stage-6 policy rule changed during watchdog rollback"
+exact_rule || fail "Stage-6 exact single policy rule changed during watchdog rollback"
 prohibit_present || fail "Stage-6 prohibit default changed during watchdog rollback"
 
 echo "DONE: Moscow client policy watchdog rolled back"
