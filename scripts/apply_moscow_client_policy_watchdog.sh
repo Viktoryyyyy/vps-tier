@@ -23,9 +23,12 @@ MUTATED=0
 
 fail() { echo "ERROR: $*" >&2; return 1; }
 host_ok() { ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | grep -Fx "$EXPECTED_IPV4" >/dev/null; }
+priority_rules() { ip -4 rule show | awk -v p="${RULE_PRIORITY}:" '$1==p {$1=$1; print}'; }
 exact_rule() {
-  ip -4 rule show | awk -v p="${RULE_PRIORITY}:" '$1==p {print $1, $2, $3, $4, $5}' |
-    grep -Fx "${RULE_PRIORITY}: from ${CLIENT_SUBNET} lookup ${TABLE_ID}" >/dev/null
+  local rules count
+  rules="$(priority_rules)"
+  count="$(printf '%s\n' "$rules" | awk 'NF{n++} END{print n+0}')"
+  [ "$count" -eq 1 ] && [ "$rules" = "${RULE_PRIORITY}: from ${CLIENT_SUBNET} lookup ${TABLE_ID}" ]
 }
 prohibit_present() { ip -4 route show table "$TABLE_ID" | grep -E '^prohibit default.*metric 32760([[:space:]]|$)' >/dev/null; }
 
@@ -54,7 +57,7 @@ bash -n "$WATCHDOG_SOURCE"
 [ -r "$STAGE6_STATE" ] || fail "Stage-6 managed state missing"
 [ -x "$POLICY_RUNTIME" ] || fail "policy runtime helper missing or not executable"
 systemctl is-active --quiet "$POLICY_SERVICE" || fail "policy barrier service inactive"
-exact_rule || fail "Stage-6 policy rule must be healthy before watchdog apply"
+exact_rule || fail "Stage-6 exact single policy rule must be healthy before watchdog apply"
 prohibit_present || fail "Stage-6 prohibit default must be healthy before watchdog apply"
 [ ! -e "$STATE_DIR" ] || fail "watchdog managed state already exists"
 [ ! -e "$WATCHDOG_TARGET" ] || fail "watchdog runtime target already exists"
@@ -72,7 +75,7 @@ systemctl start vps-tier-moscow-client-policy-watchdog.service
 systemctl enable --now vps-tier-moscow-client-policy-watchdog.timer >/dev/null
 systemctl is-enabled --quiet vps-tier-moscow-client-policy-watchdog.timer || fail "watchdog timer not enabled"
 systemctl is-active --quiet vps-tier-moscow-client-policy-watchdog.timer || fail "watchdog timer not active"
-exact_rule || fail "policy rule missing after watchdog activation"
+exact_rule || fail "exact single policy rule missing after watchdog activation"
 prohibit_present || fail "prohibit default missing after watchdog activation"
 
 install -d -o root -g root -m 0700 "$STATE_DIR"
@@ -92,6 +95,6 @@ trap - ERR
 echo "DONE: Moscow client policy watchdog applied"
 echo "WATCHDOG_TIMER=active_enabled"
 echo "INTERVAL=30s"
-echo "RULE_10710=present"
+echo "RULE_10710=present_exact_single"
 echo "PROHIBIT_DEFAULT=present"
 echo "SECRETS_PRINTED=no"
