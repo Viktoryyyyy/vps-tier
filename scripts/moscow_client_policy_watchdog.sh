@@ -27,10 +27,9 @@ prohibit_ok=no
 exact_rule && rule_ok=yes
 prohibit_present && prohibit_ok=yes
 
+# Healthy checks are intentionally silent. Journal output is reserved for
+# actual drift/repair or hard failures.
 if [ "$rule_ok" = yes ] && [ "$prohibit_ok" = yes ]; then
-  echo "POLICY_WATCHDOG=ok"
-  echo "RULE_10710=present"
-  echo "PROHIBIT_DEFAULT=present"
   exit 0
 fi
 
