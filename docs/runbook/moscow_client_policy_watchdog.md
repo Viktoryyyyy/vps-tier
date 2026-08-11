@@ -36,13 +36,7 @@ The usable `wg-backbone` default is owned by the backbone lifecycle and is delib
 
 Every 30 seconds the timer starts a one-shot checker.
 
-If both the managed rule and `prohibit default` exist, the checker exits without mutation:
-
-```text
-POLICY_WATCHDOG=ok
-RULE_10710=present
-PROHIBIT_DEFAULT=present
-```
+If both the managed rule and `prohibit default` exist, the checker exits successfully without mutation and without application-level journal output. This avoids routine healthy-state log growth.
 
 If either managed element is missing, the checker calls the already-managed Stage-6 runtime helper:
 
@@ -93,7 +87,7 @@ AccuracySec=5s
 Persistent=true
 ```
 
-The watchdog service requires and starts after `vps-tier-moscow-client-policy.service`.
+The watchdog service is ordered after `vps-tier-moscow-client-policy.service`, but deliberately does not `Require=` it. The checker itself refuses repair when the Stage-6 policy service is inactive. This prevents the watchdog from re-starting the policy barrier during a controlled Stage-6 rollback.
 
 ## Apply
 
@@ -159,6 +153,8 @@ Rollback does not remove or alter:
 - UFW forwarding rules;
 - AWG configuration;
 - WireGuard backbone configuration.
+
+Before any future full Stage-6 rollback, remove this watchdog first with its managed rollback script. This prevents an orphaned timer and makes rollback ownership explicit.
 
 ## Root Cause Boundary
 
