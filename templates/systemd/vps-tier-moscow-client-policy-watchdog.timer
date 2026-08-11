@@ -5,7 +5,6 @@ Description=VPS Tier Moscow client policy watchdog timer
 OnBootSec=30s
 OnUnitActiveSec=30s
 AccuracySec=5s
-Persistent=true
 Unit=vps-tier-moscow-client-policy-watchdog.service
 
 [Install]
