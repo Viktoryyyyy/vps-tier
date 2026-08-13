@@ -1,0 +1,27 @@
+[Unit]
+Description=VPS Tier Kazakhstan MOEX Telegram CONNECT relay
+Requires=wg-quick@wg-backbone.service
+After=network-online.target wg-quick@wg-backbone.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/libexec/vps-tier/kz-moex-telegram-connect-proxy --listen-host 10.70.0.2 --listen-port 18080 --allowed-peer 10.70.0.1 --target-host api.telegram.org --target-port 443
+Restart=on-failure
+RestartSec=5s
+DynamicUser=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
